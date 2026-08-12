@@ -1,0 +1,19 @@
+# A .gitlab-ci.yml must exist even if trivial: without one, new projects inherit
+# the Auto DevOps pipeline, which needs Docker-in-Docker and fails on every push.
+stages:
+  - test
+
+lint-and-test:
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - pip install --quiet uv
+    - uv sync --all-packages
+  script:
+    - uv run ruff check .
+    - uv run pytest -q
+    # Migrations must at least render without a database.
+    - cd server && uv run alembic upgrade head --sql > /dev/null
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
