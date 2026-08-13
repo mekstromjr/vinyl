@@ -1,0 +1,12 @@
+{% if assets %}
+<div class="photos">
+  {% for a in assets %}
+  <figure>
+    <img src="/accessions/{{ acc.accession_id }}/assets/{{ a.id }}/content" alt="{{ a.kind.value }}" loading="lazy">
+    <figcaption>{{ a.kind.value }}{% if a.side_id %} · {{ a.side_id[-4:] }}{% endif %}</figcaption>
+  </figure>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted">No photos yet. Label and runout shots are what make Discogs matching stick.</p>
+{% endif %}

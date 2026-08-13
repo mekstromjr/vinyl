@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}queue{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Inventory</h1>
+  <p class="muted">Next accession number: <strong>{{ next_id }}</strong></p>
+  <a class="btn" href="/inventory/new">New record set</a>
+</div>
+
+<div class="card">
+  <h2>Uncaptured backlog</h2>
+  {% if uncaptured %}
+  <table>
+    <tr><th>Set</th><th>Release</th><th>Sides left</th></tr>
+    {% for row in uncaptured %}
+    <tr>
+      <td><a href="/accessions/{{ row.accession_id }}">{{ row.accession_id }}</a></td>
+      <td>{{ row.artist }} — {{ row.title }}</td>
+      <td>{{ row.pending_sides }}/{{ row.total_sides }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">Nothing inventoried-but-uncaptured. Shelf is ahead of the turntable.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Recently inventoried</h2>
+  {% if recent %}
+  <table>
+    <tr><th>Set</th><th>Status</th><th>Release</th></tr>
+    {% for acc in recent %}
+    <tr>
+      <td><a href="/accessions/{{ acc.accession_id }}">{{ acc.accession_id }}</a></td>
+      <td><span class="badge {{ acc.status.value }}">{{ acc.status.value }}</span></td>
+      <td>{% if acc.release %}{{ acc.release.artist }} — {{ acc.release.title }}{% else %}<span class="muted">unbound</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">Nothing yet. Grab the first record off the shelf.</p>{% endif %}
+</div>
+{% endblock %}

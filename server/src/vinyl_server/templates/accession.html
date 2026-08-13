@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ acc.accession_id }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  {% if just_created %}
+  <p class="muted" style="margin:0">Write this on nothing — it goes on the printed card:</p>
+  {% endif %}
+  <div class="big-id">{{ acc.accession_id }}</div>
+  <p>
+    <span class="badge {{ acc.status.value }}">{{ acc.status.value }}</span>
+    <span class="muted">{{ acc.disc_count }} disc{{ "s" if acc.disc_count != 1 }} ·
+      inventoried {{ acc.inventoried_at.strftime("%Y-%m-%d") }}</span>
+  </p>
+  {% if acc.release %}
+    <p><strong>{{ acc.release.artist }}</strong> — {{ acc.release.title }}<br>
+    <span class="muted">{{ acc.release.label or "?" }} {{ acc.release.catalog_number or "" }}
+      · {{ acc.release.country or "?" }} · {{ acc.release.year or "?" }}
+      {% if acc.release.musicbrainz_release_id %}· MBID linked{% endif %}</span></p>
+  {% endif %}
+  {% if has_78 %}<div class="flag78">78 RPM — set aside for phase two. Do not capture with the current stylus.</div>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Photos</h2>
+  <div id="photos">{% include "partials/photos.html" %}</div>
+  <form hx-post="/accessions/{{ acc.accession_id }}/photos" hx-target="#photos"
+        hx-swap="innerHTML" enctype="multipart/form-data">
+    <div class="row">
+      <div>
+        <label for="kind">Kind</label>
+        <select name="kind" id="kind">
+          <option value="label">center label</option>
+          <option value="runout">runout / deadwax</option>
+          <option value="jacket_front">jacket front</option>
+          <option value="jacket_back">jacket back</option>
+          <option value="other">other</option>
+        </select>
+      </div>
+      <div>
+        <label for="disc">Disc (runout/label)</label>
+        <select name="disc" id="disc">
+          <option value="">—</option>
+          {% for d in range(1, acc.disc_count + 1) %}<option value="{{ d }}">D{{ d }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="side">Side</label>
+        <select name="side" id="side">
+          <option value="">—</option><option value="A">A</option><option value="B">B</option>
+        </select>
+      </div>
+    </div>
+    <label for="file">Photo</label>
+    <input type="file" name="file" id="file" accept="image/*" capture="environment" required>
+    <button type="submit">Upload</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Identify (Discogs)</h2>
+  <form hx-get="/accessions/{{ acc.accession_id }}/search" hx-target="#results" hx-swap="innerHTML">
+    <div class="row">
+      <div>
+        <label for="catno">Catalog number (best key)</label>
+        <input name="catno" id="catno" placeholder="RLP 9399" autocapitalize="characters">
+      </div>
+      <div>
+        <label for="q">Artist / title</label>
+        <input name="q" id="q" placeholder="Bill Evans Waltz for Debby">
+      </div>
+    </div>
+    <button type="submit">Search</button>
+  </form>
+  <div id="results"></div>
+</div>
+
+<div class="card">
+  <h2>Sides</h2>
+  <div id="sides">{% include "partials/sides_table.html" %}</div>
+</div>
+
+<div class="card">
+  <h2>Housekeeping</h2>
+  <form method="post" action="/accessions/{{ acc.accession_id }}/condition">
+    <label for="condition_notes">Condition notes</label>
+    <textarea name="condition_notes" id="condition_notes" rows="2">{{ acc.condition_notes or "" }}</textarea>
+    <button type="submit" class="secondary">Save notes</button>
+  </form>
+  <form method="post" action="/accessions/{{ acc.accession_id }}/status" style="display:inline">
+    <input type="hidden" name="status" value="unidentifiable">
+    <button type="submit" class="secondary">Mark unidentifiable</button>
+  </form>
+  <form method="post" action="/accessions/{{ acc.accession_id }}/delete" style="display:inline"
+        onsubmit="return confirm('Delete {{ acc.accession_id }} entirely?')">
+    <button type="submit" class="danger">Delete (mistake)</button>
+  </form>
+  <p class="muted" style="margin-top:.8rem">Card printing lands with ticket #4.</p>
+</div>
+
+<a class="btn" href="/inventory/new">Next record set</a>
+<a class="btn secondary" href="/">Queue</a>
+{% endblock %}

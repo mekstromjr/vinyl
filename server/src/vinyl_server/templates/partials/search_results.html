@@ -1,0 +1,18 @@
+{% if results %}
+  {% for r in results %}
+  <div class="result">
+    {% if r.thumb %}<img src="{{ r.thumb }}" alt="">{% endif %}
+    <div class="meta">
+      <strong>{{ r.title }}</strong><br>
+      <span class="muted">{{ r.year or "?" }} · {{ r.country or "?" }} ·
+        {{ r.label or "?" }} {{ r.catno or "" }}</span>
+    </div>
+    <form hx-post="/accessions/{{ acc.accession_id }}/bind" hx-target="body" hx-swap="outerHTML">
+      <input type="hidden" name="discogs_release_id" value="{{ r.discogs_release_id }}">
+      <button type="submit">This one</button>
+    </form>
+  </div>
+  {% endfor %}
+{% else %}
+<p class="muted">No vinyl releases matched. Try the catalog number off the label or spine.</p>
+{% endif %}
