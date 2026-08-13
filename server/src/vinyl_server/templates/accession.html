@@ -95,9 +95,10 @@
         onsubmit="return confirm('Delete {{ acc.accession_id }} entirely?')">
     <button type="submit" class="danger">Delete (mistake)</button>
   </form>
-  <p class="muted" style="margin-top:.8rem">Card printing lands with ticket #4.</p>
+  <p class="muted" style="margin-top:.8rem">Print on 4x6 photo stock, tuck into the archive sleeve.</p>
 </div>
 
+<a class="btn" href="/accessions/{{ acc.accession_id }}/card.pdf" target="_blank">Print card</a>
 <a class="btn" href="/inventory/new">Next record set</a>
 <a class="btn secondary" href="/">Queue</a>
 {% endblock %}
