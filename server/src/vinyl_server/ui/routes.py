@@ -221,6 +221,35 @@ def asset_content(
     )
 
 
+@router.get("/accessions/{accession_id}/card.pdf")
+def card_pdf(accession_id: str, session: Session = Depends(get_session)):
+    from fastapi.responses import Response
+
+    from vinyl_server.card import render_card
+
+    acc = services.get_accession(session, accession_id)
+    pdf = render_card(
+        accession_id=acc.accession_id,
+        artist=acc.release.artist if acc.release else None,
+        title=acc.release.title if acc.release else None,
+        label=acc.release.label if acc.release else None,
+        catalog_number=acc.release.catalog_number if acc.release else None,
+        country=acc.release.country if acc.release else None,
+        year=acc.release.year if acc.release else None,
+        disc_count=acc.disc_count,
+        speeds={s.speed_rpm for s in acc.sides},
+        condition_notes=acc.condition_notes,
+        side_ids=[s.side_id for s in sorted(acc.sides, key=lambda s: (s.disc, s.side))],
+    )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{acc.accession_id}-card.pdf"'
+        },
+    )
+
+
 @router.post("/accessions/{accession_id}/condition")
 def save_condition(
     accession_id: str,
