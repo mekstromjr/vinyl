@@ -14,7 +14,13 @@ dependencies = [
     "httpx>=0.28.0",
     "boto3>=1.35.0",
     "python-multipart>=0.0.18",
+    "jinja2>=3.1.4",
 ]
+
+[tool.hatch.build.targets.wheel.force-include]
+# Templates and static assets ship inside the wheel/image.
+"src/vinyl_server/templates" = "vinyl_server/templates"
+"src/vinyl_server/static" = "vinyl_server/static"
 
 [build-system]
 requires = ["hatchling"]

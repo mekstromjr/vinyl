@@ -8,7 +8,10 @@ accepted there); /healthz is open for probes.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import Depends, FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from vinyl_server.auth import require_api_key
 from vinyl_server.routers import accessions, discogs_search, queues
@@ -44,6 +47,17 @@ def create_app(
     app.include_router(accessions.router, dependencies=guarded)
     app.include_router(discogs_search.router, dependencies=guarded)
     app.include_router(queues.router, dependencies=guarded)
+
+    # UI: no app-level auth — reachable only via the forward-auth ingress
+    # (the /api ingress routes /api and /healthz exclusively).
+    from vinyl_server.ui.routes import router as ui_router
+
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(Path(__file__).resolve().parent / "static")),
+        name="static",
+    )
+    app.include_router(ui_router)
 
     @app.get("/healthz")
     def healthz():

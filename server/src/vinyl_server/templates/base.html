@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}vinyl{% endblock %} — meklab vinyl</title>
+  <script src="/static/htmx.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f4ef; --card: #ffffff; --ink: #1a1a1a; --muted: #6b6b6b;
+      --accent: #7a4a2b; --accent-ink: #ffffff; --line: #ddd8cf;
+      --ok: #2e7d32; --warn: #b26a00; --bad: #b3261e;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink);
+           font: 17px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; }
+    header { background: var(--accent); color: var(--accent-ink);
+             padding: .7rem 1rem; display: flex; align-items: baseline; gap: 1rem; }
+    header a { color: var(--accent-ink); text-decoration: none; font-weight: 700; }
+    header .who { margin-left: auto; font-size: .85rem; opacity: .8; }
+    main { max-width: 46rem; margin: 0 auto; padding: 1rem; }
+    .card { background: var(--card); border: 1px solid var(--line);
+            border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.35rem; margin: .2rem 0 .8rem; }
+    h2 { font-size: 1.05rem; margin: 0 0 .6rem; color: var(--muted);
+         text-transform: uppercase; letter-spacing: .04em; }
+    label { display: block; font-size: .9rem; color: var(--muted); margin-top: .7rem; }
+    input, select, textarea {
+      width: 100%; padding: .65rem; font-size: 1.05rem; margin-top: .25rem;
+      border: 1px solid var(--line); border-radius: 8px; background: #fff;
+    }
+    .row { display: flex; gap: .8rem; } .row > * { flex: 1; }
+    button, .btn {
+      display: inline-block; border: 0; border-radius: 10px; cursor: pointer;
+      background: var(--accent); color: var(--accent-ink); text-decoration: none;
+      font-size: 1.05rem; font-weight: 600; padding: .8rem 1.2rem; margin-top: .9rem;
+    }
+    button.secondary, .btn.secondary { background: #e9e4da; color: var(--ink); }
+    button.danger { background: var(--bad); }
+    .big-id { font-size: 2.6rem; font-weight: 800; letter-spacing: .03em;
+              font-variant-numeric: tabular-nums; }
+    .badge { display: inline-block; border-radius: 999px; padding: .15rem .6rem;
+             font-size: .8rem; font-weight: 700; }
+    .badge.inventoried { background: #efe6d8; color: var(--warn); }
+    .badge.identified { background: #e2efe2; color: var(--ok); }
+    .badge.unidentifiable, .badge.excluded { background: #f4dedd; color: var(--bad); }
+    .badge.pending { background: #efe6d8; color: var(--warn); }
+    .badge.skipped { background: #eee; color: var(--muted); }
+    .badge.qc_pass { background: #e2efe2; color: var(--ok); }
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    td, th { padding: .5rem .4rem; border-bottom: 1px solid var(--line); text-align: left; }
+    .muted { color: var(--muted); font-size: .9rem; }
+    .result { display: flex; gap: .8rem; align-items: center; padding: .6rem;
+              border: 1px solid var(--line); border-radius: 10px; margin-top: .6rem; }
+    .result img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; }
+    .result .meta { flex: 1; min-width: 0; }
+    .result button { margin: 0; padding: .5rem .9rem; }
+    .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+              gap: .6rem; margin-top: .6rem; }
+    .photos figure { margin: 0; }
+    .photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;
+                  border: 1px solid var(--line); }
+    .photos figcaption { font-size: .75rem; color: var(--muted); text-align: center; }
+    .flag78 { background: var(--bad); color: #fff; border-radius: 8px;
+              padding: .6rem .9rem; font-weight: 700; margin-top: .8rem; }
+    .htmx-request { opacity: .5; }
+  </style>
+</head>
+<body>
+<header>
+  <a href="/">meklab vinyl</a>
+  <span class="muted" style="color:#f3e9df">inventory</span>
+  {% if username %}<span class="who">{{ username }}</span>{% endif %}
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

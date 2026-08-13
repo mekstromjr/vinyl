@@ -1,0 +1,17 @@
+<table>
+  <tr><th>Side</th><th>Speed</th><th>Tracks</th><th>Expected</th><th>State</th></tr>
+  {% for s in sides %}
+  <tr>
+    <td>{{ s.side_id[-4:] }}</td>
+    <td>{{ s.speed_rpm }}</td>
+    <td class="muted">{{ s.positions | join(", ") if s.positions else "—" }}</td>
+    <td>{% if s.expected_runtime_sec %}{{ s.expected_runtime_sec // 60 }}:{{ "%02d" | format(s.expected_runtime_sec % 60) }}{% else %}—{% endif %}</td>
+    <td><span class="badge {{ s.state }}">{{ s.state }}</span></td>
+  </tr>
+  {% endfor %}
+</table>
+{% if unmapped_positions %}
+<p class="muted" style="margin-top:.6rem">Unassigned positions from the listing:
+  {{ unmapped_positions | join(", ") }} — the numbering names discs but not sides;
+  fix via the API side patch for now.</p>
+{% endif %}

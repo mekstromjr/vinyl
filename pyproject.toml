@@ -27,3 +27,4 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 # B008 flags `Depends()`/`File()`/`Form()` in argument defaults — that IS the
 # FastAPI dependency-injection idiom, not the bug the rule hunts.
 "server/src/vinyl_server/routers/*" = ["B008"]
+"server/src/vinyl_server/ui/*" = ["B008"]
