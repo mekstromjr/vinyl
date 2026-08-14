@@ -141,12 +141,6 @@ def render_card(
     c.setFillColor(black)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(x0, grid_top, "CAPTURE LOG")
-    c.setFont("Helvetica", 6.5)
-    c.setFillColor(_MUTED)
-    c.drawString(
-        x0 + 0.75 * inch, grid_top,
-        "handwritten, advisory — system of record is vinyl.meklab.net",
-    )
 
     box = 0.17 * inch
     rows_needed = (len(side_ids) + _GRID_COLS - 1) // _GRID_COLS
@@ -154,10 +148,12 @@ def render_card(
         box = 0.12 * inch
     gx, gy = x0, grid_top - 0.30 * inch
     col_w = (PAGE_W - 2 * MARGIN) / _GRID_COLS
+    lowest = gy - box
     for i, side_id in enumerate(side_ids):
         col, row = i % _GRID_COLS, i // _GRID_COLS
         bx = gx + col * col_w
         by = gy - row * (box + 0.16 * inch)
+        lowest = min(lowest, by - box)
         c.setStrokeColor(black)
         c.setLineWidth(1)
         c.rect(bx, by - box, box, box, stroke=1, fill=0)
@@ -165,6 +161,14 @@ def render_card(
         c.setFont("Helvetica", 8)
         # 'GM-0142-D1-A' -> 'D1-A'
         c.drawString(bx + box + 0.05 * inch, by - box + 0.035 * inch, side_id.split("-", 2)[2])
+
+    # Caption BELOW the grid (it overlapped the heading when inline). Skipped
+    # if an unusually tall grid leaves no room above the notes rule.
+    caption_y = lowest - 0.14 * inch
+    if caption_y > MARGIN + 0.36 * inch:
+        c.setFillColor(_MUTED)
+        c.setFont("Helvetica", 6.5)
+        c.drawString(x0, caption_y, "handwritten, advisory — system of record is vinyl.meklab.net")
 
     # --- Field-notes rule -----------------------------------------------------
     c.setStrokeColor(_MUTED)

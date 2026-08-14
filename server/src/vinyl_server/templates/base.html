@@ -58,8 +58,14 @@
     .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
               gap: .6rem; margin-top: .6rem; }
     .photos figure { margin: 0; }
+    .photos .thumb { position: relative; }
     .photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;
-                  border: 1px solid var(--line); }
+                  border: 1px solid var(--line); display: block; }
+    .photos .remove {
+      position: absolute; top: .25rem; right: .25rem; margin: 0; padding: 0;
+      width: 1.7rem; height: 1.7rem; line-height: 1; font-size: 1.1rem;
+      border-radius: 50%; background: rgba(0,0,0,.55); color: #fff;
+    }
     .photos figcaption { font-size: .75rem; color: var(--muted); text-align: center; }
     .flag78 { background: var(--bad); color: #fff; border-radius: 8px;
               padding: .6rem .9rem; font-weight: 700; margin-top: .8rem; }

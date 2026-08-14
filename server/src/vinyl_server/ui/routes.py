@@ -221,6 +221,21 @@ def asset_content(
     )
 
 
+@router.post("/accessions/{accession_id}/assets/{asset_id}/delete")
+def delete_asset(
+    accession_id: str,
+    asset_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    asset = session.get(Asset, asset_id)
+    if asset is None or asset.accession_id != accession_id.upper():
+        raise HTTPException(404, "no such asset")
+    services.delete_asset(session, request.app.state.s3, asset)
+    ctx = _accession_context(request, session, accession_id)
+    return templates.TemplateResponse(request, "partials/photos.html", ctx)
+
+
 @router.get("/accessions/{accession_id}/card.pdf")
 def card_pdf(accession_id: str, session: Session = Depends(get_session)):
     from fastapi.responses import Response

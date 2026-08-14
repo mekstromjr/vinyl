@@ -84,6 +84,23 @@ def test_photo_upload_returns_updated_partial(api):
     assert content.content == b"jpeg"
 
 
+def test_photo_delete_removes_row_and_object(api):
+    acc_id = _create_via_ui(api)
+    resp = api.post(
+        f"/accessions/{acc_id}/photos",
+        files={"file": ("label.jpg", io.BytesIO(b"oops"), "image/jpeg")},
+        data={"kind": "label"},
+    )
+    key = resp.text.split('src="')[1].split('"')[0]
+    asset_id = key.split("/assets/")[1].split("/")[0]
+    assert len(api.fake_s3.objects) == 1
+
+    gone = api.post(f"/accessions/{acc_id}/assets/{asset_id}/delete")
+    assert gone.status_code == 200
+    assert "No photos yet" in gone.text
+    assert api.fake_s3.objects == {}
+
+
 def test_username_header_displayed(api):
     resp = api.get("/", headers={"X-authentik-username": "michael"})
     assert "michael" in resp.text
