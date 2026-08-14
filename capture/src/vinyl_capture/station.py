@@ -19,6 +19,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+from vinyl_capture import ha
 from vinyl_capture.analysis import judge, stop_after_sec
 from vinyl_capture.apiclient import VinylApi
 from vinyl_capture.config import Settings
@@ -109,7 +110,7 @@ class Station:
             self.session = None
 
         session.stop()
-        self._plug_off()
+        ha.plug_off(self.settings)
 
         summary = session.stats.summary()
         verdict = judge(
@@ -149,6 +150,7 @@ class Station:
                 "xruns": session.xruns,
                 "stop_reason": reason,
             }
+        ha.notify(self.settings, *ha.capture_finished_message(self.review))
         return self.review
 
     def cancel(self) -> None:
@@ -161,7 +163,7 @@ class Station:
             session = self.session
             self.session = None
         session.stop()
-        self._plug_off()
+        ha.plug_off(self.settings)
         session.out_path.unlink(missing_ok=True)
         self.api.finish_capture(
             self.capture_id, status="failed", failure_reason="cancelled by operator",
@@ -179,26 +181,6 @@ class Station:
             self.side = None
             self.capture_id = None
             self.review = None
-
-    # ------------------------------------------------------------------- HA --
-    def _plug_off(self) -> None:
-        s = self.settings
-        if not (s.ha_url and s.ha_token and s.ha_entity):
-            return
-
-        def _call():
-            import httpx
-
-            # Best-effort: the turntable spinning is annoying, not data loss.
-            with contextlib.suppress(httpx.HTTPError):
-                httpx.post(
-                    f"{s.ha_url}/api/services/switch/turn_off",
-                    headers={"Authorization": f"Bearer {s.ha_token}"},
-                    json={"entity_id": s.ha_entity},
-                    timeout=10,
-                )
-
-        threading.Thread(target=_call, daemon=True).start()
 
     # ---------------------------------------------------------------- status --
     def status(self) -> dict:
