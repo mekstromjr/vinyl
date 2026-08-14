@@ -1,10 +1,10 @@
 # Virtual workspace root for the vinyl digitization service.
 #   shared/  -> vinyl-shared : IDs + state machines (worker AND server import this)
 #   server/  -> vinyl-server : FastAPI control plane + schema, runs in k3s
-# The capture worker (ticket #5) joins as a third member; it must never be a
-# dependency of the server (the cluster does not touch audio hardware).
+#   capture/ -> vinyl-capture : ripper-laptop station (never a server dependency;
+#                the cluster does not touch audio hardware)
 [tool.uv.workspace]
-members = ["shared", "server"]
+members = ["shared", "server", "capture"]
 
 [dependency-groups]
 dev = [
@@ -13,8 +13,8 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["shared/tests", "server/tests"]
-pythonpath = ["shared/src", "server/src"]
+testpaths = ["shared/tests", "server/tests", "capture/tests"]
+pythonpath = ["shared/src", "server/src", "capture/src"]
 
 [tool.ruff]
 line-length = 100
@@ -28,3 +28,5 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 # FastAPI dependency-injection idiom, not the bug the rule hunts.
 "server/src/vinyl_server/routers/*" = ["B008"]
 "server/src/vinyl_server/ui/*" = ["B008"]
+# web.py embeds the kiosk HTML/JS page with intentionally long lines.
+"capture/src/vinyl_capture/web.py" = ["E501"]

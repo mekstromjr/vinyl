@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from vinyl_server.auth import require_api_key
-from vinyl_server.routers import accessions, discogs_search, queues
+from vinyl_server.routers import accessions, captures, discogs_search, queues
 
 
 def create_app(
@@ -45,6 +45,7 @@ def create_app(
 
     guarded = [Depends(require_api_key)]
     app.include_router(accessions.router, dependencies=guarded)
+    app.include_router(captures.router, dependencies=guarded)
     app.include_router(discogs_search.router, dependencies=guarded)
     app.include_router(queues.router, dependencies=guarded)
 
