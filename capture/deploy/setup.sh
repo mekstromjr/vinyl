@@ -44,7 +44,10 @@ done
 
 # --- app venv + service ------------------------------------------------------
 cd /opt/vinyl-capture
-sudo -u vinyl /usr/local/bin/uv sync --package vinyl-capture --no-dev >/dev/null
+# The checkout (and its .venv) belong to the deploy user so rsync stays
+# simple; the vinyl service user only ever READS them at runtime.
+OWNER=$(stat -c %U /opt/vinyl-capture)
+sudo -u "$OWNER" /usr/local/bin/uv sync --package vinyl-capture --no-dev >/dev/null
 install -m 0644 capture/deploy/vinyl-capture.service /etc/systemd/system/vinyl-capture.service
 systemctl daemon-reload
 systemctl enable vinyl-capture.service >/dev/null

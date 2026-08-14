@@ -26,6 +26,9 @@ rsync -a --delete \
 
 if [ "$WRITE_ENV" = "1" ]; then
   say "provisioning /etc/vinyl-capture/env from cluster secrets"
+  # setup.sh also creates this, but env provisioning must not depend on
+  # setup having run first (fresh-wipe ordering).
+  $SSH "$BRICK" 'sudo install -d -m 0750 /etc/vinyl-capture'
   API_KEY=$(kubectl -n prod get secret vinyl-secrets -o jsonpath='{.data.api-key}' | base64 -d)
   S3_ACCESS=$(kubectl -n prod get secret vinyl-secrets -o jsonpath='{.data.s3-access-key}' | base64 -d)
   S3_SECRET=$(kubectl -n prod get secret vinyl-secrets -o jsonpath='{.data.s3-secret-key}' | base64 -d)
