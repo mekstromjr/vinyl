@@ -1,0 +1,29 @@
+[Unit]
+Description=Vinyl capture station — kiosk UI + ALSA recorder + Garage uploader
+Documentation=https://gitlab.meklab.net/meklab/vinyl
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vinyl
+Group=vinyl
+
+WorkingDirectory=/opt/vinyl-capture
+EnvironmentFile=/etc/vinyl-capture/env
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+ExecStart=/usr/local/bin/uv run --no-sync --package vinyl-capture vinyl-capture
+
+# Keep the recorder responsive: modest CPU protection against background noise
+# (the DVD ripper, updates). Real xrun immunity comes from ALSA's ring buffer +
+# ffmpeg's 4096-slot thread queue; this just biases the scheduler our way.
+Nice=-10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=2
+
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

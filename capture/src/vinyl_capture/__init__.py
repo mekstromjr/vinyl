@@ -1,0 +1,1 @@
+"""Vinyl capture station."""

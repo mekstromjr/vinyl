@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-from vinyl_shared.states import AccessionStatus, AssetKind, Speed
+from vinyl_shared.states import AccessionStatus, AssetKind, CaptureStatus, QCVerdict, Speed
 
 
 class AccessionCreate(BaseModel):
@@ -76,6 +76,56 @@ class AccessionOut(BaseModel):
     status: AccessionStatus
     release: ReleaseOut | None
     inventoried_at: datetime
+
+
+class CaptureCreate(BaseModel):
+    side_id: str
+
+
+class CaptureFinish(BaseModel):
+    status: CaptureStatus  # captured | failed
+    failure_reason: str | None = None
+    integrity: dict | None = None
+    sha256: str | None = None
+    bytes: int | None = Field(default=None, gt=0)
+    local_path: str | None = None
+    sample_rate: int | None = None
+    bit_depth: int | None = None
+    duration_sec: float | None = None
+    finished_at: datetime | None = None
+
+
+class CaptureUploaded(BaseModel):
+    s3_bucket: str
+    s3_key: str
+
+
+class UploadError(BaseModel):
+    error: str
+
+
+class CaptureOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    side_id: str
+    is_current: bool
+    supersedes: uuid.UUID | None
+    status: CaptureStatus
+    failure_reason: str | None
+    integrity: dict | None
+    qc_verdict: QCVerdict | None
+    sha256: str | None
+    bytes: int | None
+    local_path: str | None
+    s3_bucket: str | None
+    s3_key: str | None
+    sample_rate: int | None
+    bit_depth: int | None
+    duration_sec: float | None
+    upload_attempts: int
+    started_at: datetime
+    finished_at: datetime | None
 
 
 class AssetOut(BaseModel):

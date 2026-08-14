@@ -1,0 +1,26 @@
+[project]
+name = "vinyl-capture"
+version = "0.1.0"
+description = "Capture station daemon for the ripper laptop: kiosk UI + ALSA recorder + uploader."
+requires-python = ">=3.12"
+# Runs on a 2009 Core 2 Duo — keep this list short and boring.
+dependencies = [
+    "vinyl-shared",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "httpx>=0.28.0",
+    "boto3>=1.35.0",
+]
+
+[project.scripts]
+vinyl-capture = "vinyl_capture.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vinyl_capture"]
+
+[tool.uv.sources]
+vinyl-shared = { workspace = true }
