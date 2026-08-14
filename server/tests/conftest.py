@@ -55,6 +55,9 @@ class FakeS3:
     def get_object(self, Bucket, Key):
         return {"Body": io.BytesIO(self.objects[Key])}
 
+    def delete_object(self, Bucket, Key):
+        self.objects.pop(Key, None)
+
 
 RAW_RELEASE = {
     "id": 249504,

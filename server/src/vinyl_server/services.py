@@ -8,6 +8,8 @@ wire them the same way.
 
 from __future__ import annotations
 
+import contextlib
+
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
@@ -167,6 +169,18 @@ def save_photo(
     session.add(asset)
     session.flush()
     return asset
+
+
+def delete_asset(session: Session, s3_client, asset: Asset) -> None:
+    """Remove a photo/document: S3 object AND row. Unlike accession deletion
+    (which leaves objects behind), a single-asset delete means "this upload was
+    a mistake" — nothing should reference it and nothing should keep it."""
+    # The row is the authority; a failed S3 delete leaves a harmless orphan
+    # object findable under the accession prefix.
+    with contextlib.suppress(Exception):
+        s3_client.delete_object(Bucket=asset.s3_bucket, Key=asset.s3_key)
+    session.delete(asset)
+    session.flush()
 
 
 def side_grid(session: Session, accession_id: str) -> list[dict]:

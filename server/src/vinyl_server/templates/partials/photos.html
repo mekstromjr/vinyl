@@ -2,7 +2,13 @@
 <div class="photos">
   {% for a in assets %}
   <figure>
-    <img src="/accessions/{{ acc.accession_id }}/assets/{{ a.id }}/content" alt="{{ a.kind.value }}" loading="lazy">
+    <div class="thumb">
+      <img src="/accessions/{{ acc.accession_id }}/assets/{{ a.id }}/content" alt="{{ a.kind.value }}" loading="lazy">
+      <button class="remove" title="Remove this photo"
+              hx-post="/accessions/{{ acc.accession_id }}/assets/{{ a.id }}/delete"
+              hx-target="#photos" hx-swap="innerHTML"
+              hx-confirm="Remove this {{ a.kind.value }} photo?">&times;</button>
+    </div>
     <figcaption>{{ a.kind.value }}{% if a.side_id %} · {{ a.side_id[-4:] }}{% endif %}</figcaption>
   </figure>
   {% endfor %}

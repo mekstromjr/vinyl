@@ -92,13 +92,14 @@
     <button type="submit" class="secondary">Mark unidentifiable</button>
   </form>
   <form method="post" action="/accessions/{{ acc.accession_id }}/delete" style="display:inline"
-        onsubmit="return confirm('Delete {{ acc.accession_id }} entirely?')">
-    <button type="submit" class="danger">Delete (mistake)</button>
+        onsubmit="return confirm('Delete the ENTIRE record set {{ acc.accession_id }} — sides, captures, and photos? Any printed card becomes invalid.')">
+    <button type="submit" class="danger">Delete entire record set</button>
   </form>
-  <p class="muted" style="margin-top:.8rem">Print on 4x6 photo stock, tuck into the archive sleeve.</p>
+  <p class="muted" style="margin-top:.8rem">Print on 4x6 photo stock, tuck into the archive sleeve.
+    Deleting removes this accession and everything under it — for sets created by accident.</p>
 </div>
 
 <a class="btn" href="/accessions/{{ acc.accession_id }}/card.pdf" target="_blank">Print card</a>
 <a class="btn" href="/inventory/new">Next record set</a>
-<a class="btn secondary" href="/">Queue</a>
+<a class="btn secondary" href="/">Back to queue</a>
 {% endblock %}
