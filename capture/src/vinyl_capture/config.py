@@ -36,10 +36,11 @@ class Settings:
     s3_bucket: str
     s3_access_key: str
     s3_secret_key: str
-    #: Optional Home Assistant turntable-plug cutoff (ticket #6 completes this).
+    #: Home Assistant integration (ticket #6): plug cutoff + phone notify.
     ha_url: str
     ha_token: str
     ha_entity: str
+    ha_notify_service: str
 
 
 @lru_cache(maxsize=1)
@@ -61,4 +62,5 @@ def settings() -> Settings:
         ha_url=_env("VINYL_HA_URL", ""),
         ha_token=_env("VINYL_HA_TOKEN", ""),
         ha_entity=_env("VINYL_HA_ENTITY", ""),
+        ha_notify_service=_env("VINYL_HA_NOTIFY_SERVICE", ""),
     )

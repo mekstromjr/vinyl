@@ -30,6 +30,10 @@ if [ "$WRITE_ENV" = "1" ]; then
   # setup having run first (fresh-wipe ordering).
   $SSH "$BRICK" 'sudo install -d -m 0750 /etc/vinyl-capture'
   API_KEY=$(kubectl -n prod get secret vinyl-secrets -o jsonpath='{.data.api-key}' | base64 -d)
+  HA_TOKEN=$(kubectl -n prod get secret vinyl-secrets -o jsonpath='{.data.ha-token}' | base64 -d)
+  if [ -z "$HA_TOKEN" ]; then
+    say "WARNING: no ha-token in vinyl-secrets yet — HA integration will be dormant"
+  fi
   S3_ACCESS=$(kubectl -n prod get secret vinyl-secrets -o jsonpath='{.data.s3-access-key}' | base64 -d)
   S3_SECRET=$(kubectl -n prod get secret vinyl-secrets -o jsonpath='{.data.s3-secret-key}' | base64 -d)
   # HA plug config lands with ticket #6; placeholders keep the flag off.
@@ -39,9 +43,10 @@ VINYL_API_KEY=$API_KEY
 VINYL_S3_ENDPOINT=https://s3.meklab.net
 VINYL_S3_ACCESS_KEY=$S3_ACCESS
 VINYL_S3_SECRET_KEY=$S3_SECRET
-VINYL_HA_URL=
-VINYL_HA_TOKEN=
-VINYL_HA_ENTITY=
+VINYL_HA_URL=https://home.meklab.net
+VINYL_HA_TOKEN=${HA_TOKEN}
+VINYL_HA_ENTITY=switch.<turntable-plug>
+VINYL_HA_NOTIFY_SERVICE=mobile_app_<phone>
 EOF
 fi
 
