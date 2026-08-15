@@ -84,40 +84,50 @@ def decode_stereo(path: str, sample_rate: int, stats: StereoStats) -> None:
     proc.wait()
 
 
-def click_rate(path: str, duration_sec: float) -> dict:
-    """Clicks/minute: 3 kHz high-pass, 5 ms window crest factor.
+def click_rate(
+    path: str, onset_sec: float, music_end_sec: float
+) -> dict:
+    """Clicks/minute inside the MUSIC region, judged against LOCAL context.
 
-    A click is a broadband transient; after removing everything the music
-    mostly lives in, a 5 ms window whose peak is far above the running HF
-    floor is a surface fault.
-    """
+    First calibration produced 300-800 clicks/min on ordinary records: a
+    running global floor let every musical HF transient count as a click, and
+    the runout region added a tick per revolution for however long the timer
+    over-captured. A click is now a 5 ms window that towers over the median
+    peak of ITS OWN surrounding second — cymbal washes raise the local median
+    and stop counting; isolated surface ticks still stand out."""
     proc = subprocess.Popen(
         ["ffmpeg", "-v", "quiet", "-i", path, "-af", "highpass=f=3000",
          "-f", "f32le", "-ac", "1", "-ar", "48000", "-"],
         stdout=subprocess.PIPE,
     )
     win = 240  # 5 ms at 48k
+    per_sec = 48000 // win
     clicks = 0
-    floors: list[float] = []
+    t = 0.0
     carry = np.empty(0, dtype=np.float32)
     while True:
         raw = proc.stdout.read(48000 * 4)
         if not raw:
             break
         x = np.concatenate([carry, np.frombuffer(raw, dtype=np.float32)])
-        usable = len(x) - len(x) % win
+        usable = len(x) - len(x) % (win * per_sec)
         carry = x[usable:]
         if not usable:
             continue
-        frames = np.abs(x[:usable].reshape(-1, win))
-        peaks = frames.max(axis=1)
-        rms_floor = float(np.sqrt((frames**2).mean()))
-        floors.append(rms_floor)
-        running_floor = float(np.median(floors[-60:]))
-        if running_floor > 0:
-            clicks += int((peaks > max(10 * running_floor, 0.003)).sum())
+        seconds = np.abs(x[:usable]).reshape(-1, per_sec, win)
+        peaks = seconds.max(axis=2)                    # (n_sec, windows/sec)
+        local_median = np.median(peaks, axis=1, keepdims=True)
+        for si in range(len(peaks)):
+            sec_start = t + si
+            if sec_start < onset_sec or sec_start > music_end_sec:
+                continue
+            m = float(local_median[si, 0])
+            clicks += int(
+                (peaks[si] > np.maximum(8 * m, 0.004)).sum()
+            )
+        t += len(peaks)
     proc.wait()
-    minutes = max(duration_sec / 60, 1e-6)
+    minutes = max((music_end_sec - onset_sec) / 60, 1e-6)
     return {"clicks": clicks, "clicks_per_min": round(clicks / minutes, 1)}
 
 

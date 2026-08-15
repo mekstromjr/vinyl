@@ -44,7 +44,7 @@ def run(capture_id: uuid.UUID) -> str:
         onset, music_end = metrics.music_bounds(stats.envelope_100ms)
         noise_floor = metrics.lead_in_noise_floor(stats.envelope_100ms, onset)
         drops = metrics.dropouts(stats.envelope_100ms, onset, music_end)
-        clicks = metrics.click_rate(path, summary["duration_sec"])
+        clicks = metrics.click_rate(path, onset, music_end)
         loop = loop_scan(stats.envelope_100ms, int(side.speed_rpm), music_end)
 
         result = judge(
