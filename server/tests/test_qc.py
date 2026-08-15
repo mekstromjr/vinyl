@@ -134,5 +134,19 @@ def test_metrics_on_synthetic_wav(tmp_path):
     floor = metrics.lead_in_noise_floor(stats.envelope_100ms, onset)
     assert floor is not None and floor < -40
 
-    clicks = metrics.click_rate(str(path), s["duration_sec"])
+    clicks = metrics.click_rate(str(path), onset, end)
     assert clicks["clicks"] >= 5  # ~10 injected
+    # a pure tone with no clicks must count ~zero (the first calibration
+    # counted musical HF transients; local-median context must not)
+    clean = tmp_path / "clean.wav"
+    with wave.open(str(clean), "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        frames = bytearray()
+        for i in range(sr * 20):
+            v = int(12000 * math.sin(2 * math.pi * 5000 * i / sr))
+            frames += struct.pack("<hh", v, v)
+        w.writeframes(bytes(frames))
+    quiet = metrics.click_rate(str(clean), 0.0, 20.0)
+    assert quiet["clicks_per_min"] < 5
