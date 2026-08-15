@@ -1,0 +1,16 @@
+{% if q and rows %}
+<table>
+  <tr><th>Set</th><th>Status</th><th>Release</th><th>Cat#</th><th>Year</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td><a href="/accessions/{{ r.accession_id }}">{{ r.accession_id }}</a></td>
+    <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
+    <td>{% if r.artist %}{{ r.artist }} — {{ r.title }}{% else %}<span class="muted">unbound</span>{% endif %}</td>
+    <td class="muted">{{ r.catalog_number or "" }}</td>
+    <td class="muted">{{ r.year or "" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% elif q %}
+<p class="muted">Nothing matches "{{ q }}".</p>
+{% endif %}

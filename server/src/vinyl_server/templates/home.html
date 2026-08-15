@@ -8,6 +8,15 @@
 </div>
 
 <div class="card">
+  <h2>Find a record</h2>
+  <input id="find" name="q" placeholder="accession, artist, title, label, catalog number, year..."
+         autocomplete="off"
+         hx-get="/find" hx-target="#find-results" hx-swap="innerHTML"
+         hx-trigger="input changed delay:300ms, search">
+  <div id="find-results"></div>
+</div>
+
+<div class="card">
   <h2>Uncaptured backlog</h2>
   {% if uncaptured %}
   <table>

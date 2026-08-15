@@ -1,0 +1,68 @@
+"""Home search + sides size column."""
+
+from __future__ import annotations
+
+import os
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("VINYL_TEST_DB_URL") is None, reason="VINYL_TEST_DB_URL not set"
+)
+
+RELEASE_ID = 249504
+
+
+def _bound_accession(api):
+    acc = api.post(
+        "/api/accessions",
+        json={"collection": "GM", "disc_count": 1, "speed_rpm": 33,
+              "condition_notes": "seam split on jacket"},
+    ).json()
+    api.post(
+        f"/api/accessions/{acc['accession_id']}/bind",
+        json={"discogs_release_id": RELEASE_ID},
+    )
+    return acc["accession_id"]
+
+
+@pytest.mark.parametrize("query", [
+    "GM-0001",        # accession id
+    "bill evans",     # artist, case-insensitive
+    "waltz",          # title
+    "riverside",      # label
+    "RLP 9399",       # catalog number
+    "seam split",     # condition notes
+    "1962",           # year
+])
+def test_find_matches_every_human_field(api, query):
+    acc_id = _bound_accession(api)
+    resp = api.get("/find", params={"q": query})
+    assert resp.status_code == 200
+    assert acc_id in resp.text, f"query {query!r} missed"
+
+
+def test_find_no_match_and_empty(api):
+    _bound_accession(api)
+    assert "Nothing matches" in api.get("/find", params={"q": "zeppelin"}).text
+    assert api.get("/find", params={"q": ""}).text.strip() == ""
+
+
+def test_home_has_search_box(api):
+    resp = api.get("/")
+    assert 'hx-get="/find"' in resp.text
+
+
+def test_sides_table_shows_size_once_captured(api):
+    acc_id = _bound_accession(api)
+    side_id = f"{acc_id}-D1-A"
+    cap = api.post("/api/captures", json={"side_id": side_id}).json()
+    api.patch(
+        f"/api/captures/{cap['id']}",
+        json={"status": "captured", "bytes": 486889419},
+    )
+    page = api.get(f"/accessions/{acc_id}")
+    assert "464 MB" in page.text  # 486889419 / 1048576 rounded
+    # API surface carries it too
+    grid = api.get(f"/api/accessions/{acc_id}/sides").json()
+    assert next(s for s in grid if s["side_id"] == side_id)["bytes"] == 486889419

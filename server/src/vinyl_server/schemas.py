@@ -61,6 +61,7 @@ class SideStatusOut(BaseModel):
     state: str
     qc_verdict: str | None
     captured_at: datetime | None
+    bytes: int | None = None
 
 
 class AccessionOut(BaseModel):
