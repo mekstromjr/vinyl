@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from vinyl_shared.states import CaptureStatus, SideStatus, Speed, can_transition
@@ -92,7 +92,10 @@ def finish_capture(
 
 @router.post("/{capture_id}/uploaded", response_model=CaptureOut)
 def mark_uploaded(
-    capture_id: uuid.UUID, body: CaptureUploaded, session: Session = Depends(get_session)
+    capture_id: uuid.UUID,
+    body: CaptureUploaded,
+    request: Request,
+    session: Session = Depends(get_session),
 ):
     cap = _get_capture(session, capture_id)
     if not can_transition(cap.status, CaptureStatus.UPLOADED):
@@ -101,6 +104,23 @@ def mark_uploaded(
     cap.s3_key = body.s3_key
     cap.status = CaptureStatus.UPLOADED
     session.flush()
+    # Event-driven QC: one Job per master. Spawn failure never fails the
+    # upload — the side stays qc_pending and /qc re-triggers it.
+    request.app.state.spawn_qc(cap.id)
+    return cap
+
+
+@router.post("/{capture_id}/qc", response_model=CaptureOut)
+def trigger_qc(
+    capture_id: uuid.UUID, request: Request, session: Session = Depends(get_session)
+):
+    """Manual QC (re-)run: retries after spawn failures, and the backfill path
+    for masters uploaded before QC existed."""
+    cap = _get_capture(session, capture_id)
+    if cap.status != CaptureStatus.UPLOADED:
+        raise HTTPException(409, f"capture is {cap.status}, not uploaded")
+    if not request.app.state.spawn_qc(cap.id):
+        raise HTTPException(502, "QC job spawn failed; see server logs")
     return cap
 
 

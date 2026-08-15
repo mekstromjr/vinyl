@@ -26,6 +26,7 @@ lint-and-test:
     POSTGRES_PASSWORD: ci-only
     VINYL_TEST_DB_URL: postgresql+psycopg://vinyl:ci-only@postgres:5432/vinyl_test
   before_script:
+    - apt-get update -qq && apt-get install -yqq ffmpeg > /dev/null
     - pip install --quiet uv
     - uv sync --all-packages
   script:

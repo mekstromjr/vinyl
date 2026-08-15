@@ -161,8 +161,12 @@ def api(session_factory):
         finally:
             s.close()
 
+    spawned: list = []
+    app.state.spawn_qc = lambda cid: (spawned.append(cid), True)[1]
+
     app.dependency_overrides[get_session] = _test_session
     client = TestClient(app)
+    client.spawned_qc = spawned
     client.headers["X-API-Key"] = "test-key"
     client.fake_s3 = fake_s3
     return client
