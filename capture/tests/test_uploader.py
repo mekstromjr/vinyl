@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 from vinyl_capture.uploader import Uploader
 
@@ -27,6 +29,11 @@ class FakeS3:
     def __init__(self, fail=False):
         self.objects = {}
         self.fail = fail
+
+    def upload_file(self, Filename, Bucket, Key, ExtraArgs=None, Config=None):
+        if self.fail:
+            raise RuntimeError("simulated network EOF")
+        self.objects[Key] = pathlib.Path(Filename).read_bytes()
 
     def put_object(self, Bucket, Key, Body, ContentType=None):
         if self.fail:
@@ -87,7 +94,7 @@ def test_s3_failure_reports_and_retains(stage):
     up._s3 = FakeS3(fail=True)
     up._drain()
     assert f.exists()
-    assert api.errors and "garage unreachable" in api.errors[0][1]
+    assert api.errors and "simulated network EOF" in api.errors[0][1]
     assert api.uploaded == []
 
 

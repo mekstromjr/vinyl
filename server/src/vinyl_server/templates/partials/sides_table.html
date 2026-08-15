@@ -1,5 +1,5 @@
 <table>
-  <tr><th>Side</th><th>Speed</th><th>Tracks</th><th>Expected</th><th>State</th></tr>
+  <tr><th>Side</th><th>Speed</th><th>Tracks</th><th>Expected</th><th>State</th><th></th></tr>
   {% for s in sides %}
   <tr>
     <td>{{ s.side_id[-4:] }}</td>
@@ -7,9 +7,55 @@
     <td class="muted">{{ s.positions | join(", ") if s.positions else "—" }}</td>
     <td>{% if s.expected_runtime_sec %}{{ s.expected_runtime_sec // 60 }}:{{ "%02d" | format(s.expected_runtime_sec % 60) }}{% else %}—{% endif %}</td>
     <td><span class="badge {{ s.state }}">{{ s.state }}</span></td>
+    <td>{% if s.side_id in listen %}
+      <button type="button" class="secondary" style="margin:0;padding:.3rem .8rem;font-size:.9rem"
+              onclick="toggleListen('{{ s.side_id }}')">Listen</button>
+    {% endif %}</td>
   </tr>
+  {% if s.side_id in listen %}
+  <tr id="listen-{{ s.side_id }}" style="display:none">
+    <td colspan="6">
+      <canvas id="wave-{{ s.side_id }}" data-envelope='{{ listen[s.side_id].envelope | tojson }}'
+              height="80" style="width:100%;background:#141210;border-radius:8px;cursor:pointer"></canvas>
+      <audio id="audio-{{ s.side_id }}" controls preload="none" style="width:100%;margin-top:.4rem"
+             src="/accessions/{{ s.side_id.rsplit('-', 2)[0] }}/captures/{{ listen[s.side_id].capture_id }}/audio"></audio>
+    </td>
+  </tr>
+  {% endif %}
   {% endfor %}
 </table>
+{% if listen %}
+<script>
+function toggleListen(sideId){
+  const row = document.getElementById('listen-' + sideId);
+  const open = row.style.display === 'none';
+  row.style.display = open ? '' : 'none';
+  if (open) drawSideWave(sideId);
+}
+function drawSideWave(sideId){
+  const canvas = document.getElementById('wave-' + sideId);
+  const env = JSON.parse(canvas.dataset.envelope || '[]');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.clientWidth;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!env.length){ ctx.fillStyle = '#999'; ctx.fillText('no waveform recorded for this capture', 10, 20); return; }
+  ctx.fillStyle = '#7a4a2b';
+  const w = canvas.width / env.length, h = canvas.height;
+  env.forEach((v, i) => {
+    const db = v > 0 ? 20 * Math.log10(v) : -60;
+    const bar = Math.max(1, (Math.min(0, db) + 60) / 60 * h);
+    ctx.fillRect(i * w, (h - bar) / 2, Math.max(1, w * 0.8), bar);
+  });
+  canvas.onclick = e => {
+    const a = document.getElementById('audio-' + sideId);
+    const frac = e.offsetX / canvas.clientWidth;
+    const seek = () => { a.currentTime = frac * a.duration; a.play(); };
+    if (a.duration) seek();
+    else { a.addEventListener('loadedmetadata', seek, {once: true}); a.load(); }
+  };
+}
+</script>
+{% endif %}
 {% if unmapped_positions %}
 <p class="muted" style="margin-top:.6rem">Unassigned positions from the listing:
   {{ unmapped_positions | join(", ") }} — the numbering names discs but not sides;

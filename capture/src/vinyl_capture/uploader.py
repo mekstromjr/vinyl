@@ -16,6 +16,7 @@ import threading
 from pathlib import Path
 
 import boto3
+from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 
 from vinyl_capture.apiclient import ApiError, VinylApi
@@ -31,7 +32,15 @@ def make_s3(settings: Settings):
         region_name=settings.s3_region,
         aws_access_key_id=settings.s3_access_key,
         aws_secret_access_key=settings.s3_secret_key,
-        config=Config(s3={"addressing_style": "path"}),
+        # when_required: botocore's flexible-checksum validation (1.36+)
+        # aborts reads of multipart objects on Garage — its composite checksum
+        # headers don't match botocore's expectation. Integrity is covered by
+        # our own end-to-end sha256, recorded at capture time.
+        config=Config(
+            s3={"addressing_style": "path"},
+            response_checksum_validation="when_required",
+            request_checksum_calculation="when_required",
+        ),
     )
 
 
@@ -109,11 +118,16 @@ class Uploader:
         if self._s3 is None:
             self._s3 = make_s3(self.settings)
         try:
-            with path.open("rb") as f:
-                self._s3.put_object(
-                    Bucket=self.settings.s3_bucket, Key=key, Body=f,
-                    ContentType="audio/flac",
-                )
+            # Multipart with per-part retry: a network blip costs one 16 MB
+            # part, not the whole half-gigabyte master.
+            self._s3.upload_file(
+                str(path), self.settings.s3_bucket, key,
+                ExtraArgs={"ContentType": "audio/flac"},
+                Config=TransferConfig(
+                    multipart_threshold=32 * 1024 * 1024,
+                    multipart_chunksize=16 * 1024 * 1024,
+                ),
+            )
             self.api.mark_uploaded(capture_id, self.settings.s3_bucket, key)
         except Exception as exc:
             with contextlib.suppress(ApiError):

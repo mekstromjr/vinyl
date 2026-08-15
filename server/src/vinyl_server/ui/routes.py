@@ -49,12 +49,26 @@ def _accession_context(request: Request, session: Session, accession_id: str, **
     assets = session.scalars(
         select(Asset).where(Asset.accession_id == acc.accession_id).order_by(Asset.created_at)
     ).all()
+
+    # Listen affordance: current captures that have an uploaded master.
+    from vinyl_server.db.models import Capture
+
+    cap_ids = [row["current_capture_id"] for row in grid if row.get("current_capture_id")]
+    listen: dict[str, dict] = {}
+    if cap_ids:
+        for cap in session.scalars(select(Capture).where(Capture.id.in_(cap_ids))):
+            if cap.s3_key:
+                listen[cap.side_id] = {
+                    "capture_id": str(cap.id),
+                    "envelope": (cap.integrity or {}).get("envelope_1s") or [],
+                }
     return {
         "username": _username(request),
         "acc": acc,
         "sides": sides,
         "assets": assets,
         "unmapped_positions": unmapped,
+        "listen": listen,
         "has_78": any(s.speed_rpm == Speed.RPM_78 for s in acc.sides),
         **extra,
     }
@@ -234,6 +248,67 @@ def delete_asset(
     services.delete_asset(session, request.app.state.s3, asset)
     ctx = _accession_context(request, session, accession_id)
     return templates.TemplateResponse(request, "partials/photos.html", ctx)
+
+
+@router.get("/accessions/{accession_id}/captures/{capture_id}/audio")
+def capture_audio(
+    accession_id: str,
+    capture_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """Stream a master from Garage with HTTP Range support.
+
+    Range is what makes the scrub bar usable: seeking fetches byte ranges via
+    S3 instead of downloading half a gigabyte to hear ten seconds. Totals come
+    from the bytes column recorded at capture time.
+    """
+    from fastapi.responses import Response
+
+    from vinyl_server.db.models import Capture
+
+    cap = session.get(Capture, capture_id)
+    if (
+        cap is None
+        or cap.side_id.rsplit("-", 2)[0] != accession_id.upper()
+        or cap.s3_key is None
+    ):
+        raise HTTPException(404, "no uploaded audio for that capture")
+
+    total = cap.bytes
+    range_header = request.headers.get("range")
+    s3 = request.app.state.s3
+    common = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'inline; filename="{cap.side_id}.flac"',
+    }
+    if range_header and total:
+        try:
+            start_s, _, end_s = range_header.split("=", 1)[1].partition("-")
+            start = int(start_s) if start_s else 0
+            end = min(int(end_s) if end_s else total - 1, total - 1)
+        except ValueError as exc:
+            raise HTTPException(416, "bad Range header") from exc
+        if start >= total:
+            raise HTTPException(416, "Range beyond end of file")
+        obj = s3.get_object(Bucket=cap.s3_bucket, Key=cap.s3_key,
+                            Range=f"bytes={start}-{end}")
+        return Response(
+            content=obj["Body"].read(),
+            status_code=206,
+            media_type="audio/flac",
+            headers=dict(
+                common,
+                **{
+                    "Content-Range": f"bytes {start}-{end}/{total}",
+                    "Content-Length": str(end - start + 1),
+                },
+            ),
+        )
+    obj = s3.get_object(Bucket=cap.s3_bucket, Key=cap.s3_key)
+    return StreamingResponse(
+        obj["Body"], media_type="audio/flac", headers=common
+    )
 
 
 @router.get("/accessions/{accession_id}/card.pdf")

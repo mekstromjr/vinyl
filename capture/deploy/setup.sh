@@ -42,6 +42,13 @@ for t in apt-daily.timer apt-daily-upgrade.timer mintupdate-automation-upgrade.t
   systemctl try-restart "$t" 2>/dev/null || true
 done
 
+# --- LAN-direct S3 ------------------------------------------------------------
+# s3.meklab.net resolves to Traefik's TAILNET ingress IP by design; from this
+# LAN-resident laptop that drags half-gigabyte masters through the tailscale
+# overlay (observed: mid-transfer EOFs when the path degrades to DERP). Pin the
+# hostname to the LAN VIP — same name, same cert, overlay out of the data path.
+grep -q "s3.meklab.net" /etc/hosts ||   echo "<lan-ip> s3.meklab.net  # vinyl-capture: LAN-direct upload path" >> /etc/hosts
+
 # --- app venv + service ------------------------------------------------------
 cd /opt/vinyl-capture
 # The checkout (and its .venv) belong to the deploy user so rsync stays
