@@ -49,6 +49,12 @@ class StreamStats:
     hold_l: float = 0.0
     hold_r: float = 0.0
 
+    #: Per-second peak envelope (linear 0..1) — the scrub-bar waveform. ~1300
+    #: floats for a 22-minute side: negligible to keep, gold to look at.
+    envelope: list[float] = field(default_factory=list)
+    _bucket_peak: int = field(default=0, repr=False)
+    _bucket_frames: int = field(default=0, repr=False)
+
     _held_since: float = field(default=0.0, repr=False)
 
     HOLD_SEC = 3.0
@@ -73,6 +79,14 @@ class StreamStats:
         self.dc_sum_l += sum(left)
         self.dc_sum_r += sum(right)
 
+        # Envelope: one peak value per second of audio.
+        self._bucket_peak = max(self._bucket_peak, peak_l, peak_r)
+        self._bucket_frames += len(left)
+        while self._bucket_frames >= self.sample_rate:
+            self.envelope.append(round(self._bucket_peak / _FULL_SCALE, 4))
+            self._bucket_frames -= self.sample_rate
+            self._bucket_peak = 0
+
         self.meter_l = peak_l / _FULL_SCALE
         self.meter_r = peak_r / _FULL_SCALE
         if self.meter_l >= self.hold_l or self.meter_r >= self.hold_r or (
@@ -95,6 +109,8 @@ class StreamStats:
             "clipped_samples": self.clipped_samples,
             "dc_offset_l": round(self.dc_sum_l / n / _FULL_SCALE, 6),
             "dc_offset_r": round(self.dc_sum_r / n / _FULL_SCALE, 6),
+            "envelope_1s": self.envelope
+            + ([round(self._bucket_peak / _FULL_SCALE, 4)] if self._bucket_frames else []),
         }
 
 

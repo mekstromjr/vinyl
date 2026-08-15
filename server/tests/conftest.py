@@ -52,8 +52,15 @@ class FakeS3:
     def put_object(self, Bucket, Key, Body, ContentType=None):
         self.objects[Key] = Body
 
-    def get_object(self, Bucket, Key):
-        return {"Body": io.BytesIO(self.objects[Key])}
+    def get_object(self, Bucket, Key, Range=None):
+        data = self.objects[Key]
+        if Range:
+            spec = Range.split("=", 1)[1]
+            start_s, _, end_s = spec.partition("-")
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else len(data) - 1
+            data = data[start:end + 1]
+        return {"Body": io.BytesIO(data)}
 
     def delete_object(self, Bucket, Key):
         self.objects.pop(Key, None)

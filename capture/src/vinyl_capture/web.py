@@ -102,6 +102,15 @@ def create_app(station: Station | None = None, api: VinylApi | None = None) -> F
         station.acknowledge()
         return station.status()
 
+    @app.get("/audio/{capture_id}")
+    def audio(capture_id: str):
+        from fastapi.responses import FileResponse
+
+        matches = list(s.staging_dir.glob(f"*__{capture_id}.flac"))
+        if not matches:
+            raise HTTPException(404, "no staged audio for that capture (already uploaded?)")
+        return FileResponse(matches[0], media_type="audio/flac")
+
     @app.get("/healthz")
     def healthz():
         return {"status": "ok", "phase": station.phase}
@@ -176,6 +185,10 @@ _PAGE = """<!doctype html>
 <div id="review" class="screen">
   <div class="big" id="v-head"></div>
   <div id="v-detail" style="margin:.6rem 0"></div>
+  <div id="v-listen" style="display:none">
+    <canvas id="v-wave" height="90" style="width:100%;background:#000;border-radius:8px;cursor:pointer"></canvas>
+    <audio id="v-audio" controls preload="metadata" style="width:100%;margin-top:.4rem"></audio>
+  </div>
   <button id="v-next" onclick="post('/ack').then(showScan)">Next side / record</button>
   <button class="ghost" id="v-retry">Record this side again</button>
 </div>
@@ -229,6 +242,19 @@ $('g-go').addEventListener('click', async () => {
   try { await post('/arm', {side_id: selected}); } catch(err){ $('g-warn').textContent = err.message; }
 });
 
+function drawWave(canvas, env){
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.clientWidth;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!env.length) { ctx.fillStyle='#666'; ctx.fillText('no waveform for this capture', 10, 20); return; }
+  ctx.fillStyle = '#c9a97e';
+  const w = canvas.width / env.length, h = canvas.height;
+  env.forEach((v,i) => {
+    const db = v>0 ? 20*Math.log10(v) : -60;
+    const bar = Math.max(1, (Math.min(0, db) + 60) / 60 * h);
+    ctx.fillRect(i*w, (h-bar)/2, Math.max(1, w*0.8), bar);
+  });
+}
 function pct(db){ return Math.min(100, Math.max(0, (db + 60) / 60 * 100)); }
 function drawMeter(el, lin, hold){
   const db = lin>0 ? 20*Math.log10(lin) : -120, hdb = hold>0 ? 20*Math.log10(hold) : -120;
@@ -253,6 +279,15 @@ setInterval(async () => {
     } else if(st.phase === 'review' && st.review){
       if(!$('review').classList.contains('active')){
         const ok = st.review.status === 'captured';
+        if(ok && st.capture_id){
+          $('v-listen').style.display = 'block';
+          $('v-audio').src = '/audio/' + st.capture_id;
+          drawWave($('v-wave'), (st.review.summary||{}).envelope_1s || []);
+          $('v-wave').onclick = e => {
+            const a = $('v-audio'), frac = e.offsetX / $('v-wave').clientWidth;
+            if (a.duration) { a.currentTime = frac * a.duration; a.play(); }
+          };
+        } else { $('v-listen').style.display = 'none'; $('v-audio').removeAttribute('src'); }
         $('v-head').innerHTML = ok ? '<span class="verdict-pass">Capture OK</span>'
                                    : '<span class="verdict-fail">Capture FAILED</span>';
         $('v-detail').innerHTML = ok

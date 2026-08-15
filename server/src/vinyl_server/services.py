@@ -187,7 +187,7 @@ def side_grid(session: Session, accession_id: str) -> list[dict]:
     rows = session.execute(
         text(
             "SELECT side_id, disc, side, speed_rpm, expected_runtime_sec, state, "
-            "qc_verdict, captured_at FROM v_side_status "
+            "qc_verdict, captured_at, current_capture_id FROM v_side_status "
             "WHERE accession_id = :a ORDER BY disc, side"
         ),
         {"a": accession_id.upper()},
