@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from vinyl_capture import ha
-from vinyl_capture.analysis import judge, stop_after_sec
+from vinyl_capture.analysis import ROTATION_PERIOD_SEC, judge, stop_after_sec
 from vinyl_capture.apiclient import VinylApi
 from vinyl_capture.config import Settings
 from vinyl_capture.recorder import RecordingSession
@@ -75,6 +75,8 @@ class Station:
                 device=self.settings.alsa_device,
                 sample_rate=self.settings.sample_rate,
                 out_path=out,
+                rotation_period_sec=ROTATION_PERIOD_SEC.get(side["speed_rpm"]),
+                on_loop=self._on_loop,
             )
             self.side = side
             self.capture_id = cap["id"]
@@ -98,6 +100,19 @@ class Station:
         with contextlib.suppress(RuntimeError):  # operator beat the timer to it
             self.stop(reason="timer")
 
+    def _on_loop(self) -> None:
+        """The stylus is looping one revolution. Position decides the meaning:
+        mid-record it is a scratch (fail + discard); at/after the expected
+        runtime it is the runout groove doing its job (success, ~3 min sooner
+        than the timer). Unbound sides can't be distinguished -> keep capture,
+        note the periodicity for human review."""
+        side = self.side or {}
+        expected = side.get("expected_runtime_sec")
+        elapsed = self.session.elapsed_sec if self.session else 0
+        reason = "locked_groove" if expected and elapsed < expected - 60 else "runout"
+        with contextlib.suppress(RuntimeError):
+            self.stop(reason=reason)
+
     # ----------------------------------------------------------------- stop --
     def stop(self, reason: str = "operator") -> dict:
         with self._lock:
@@ -113,10 +128,13 @@ class Station:
         ha.plug_off(self.settings)
 
         summary = session.stats.summary()
+        loop = session.loop_detector
         verdict = judge(
             summary,
             xruns=session.xruns,
             expected_runtime_sec=(side or {}).get("expected_runtime_sec"),
+            locked_groove=(reason == "locked_groove"),
+            loop_started_at_sec=loop.loop_started_at_sec if loop else None,
         )
         sha = _sha256(session.out_path) if session.out_path.exists() else None
         size = session.out_path.stat().st_size if session.out_path.exists() else None
