@@ -111,6 +111,37 @@ def home(request: Request, session: Session = Depends(get_session)):
     )
 
 
+@router.get("/find")
+def find(request: Request, q: str = "", session: Session = Depends(get_session)):
+    """Home-screen search: one box, every field a human remembers a record by."""
+    q = q.strip()
+    rows = []
+    if q:
+        rows = session.execute(
+            text(
+                """
+                SELECT a.accession_id, a.status, a.condition_notes,
+                       r.artist, r.title, r.label, r.catalog_number, r.year
+                FROM accession a
+                LEFT JOIN release r ON r.discogs_release_id = a.release_id
+                WHERE a.accession_id ILIKE :like
+                   OR r.artist ILIKE :like
+                   OR r.title ILIKE :like
+                   OR r.label ILIKE :like
+                   OR r.catalog_number ILIKE :like
+                   OR a.condition_notes ILIKE :like
+                   OR r.year::text = :exact
+                ORDER BY a.accession_id
+                LIMIT 25
+                """
+            ),
+            {"like": f"%{q}%", "exact": q},
+        ).all()
+    return templates.TemplateResponse(
+        request, "partials/find_results.html", {"rows": rows, "q": q}
+    )
+
+
 @router.get("/inventory/new")
 def new_form(request: Request):
     return templates.TemplateResponse(

@@ -186,9 +186,11 @@ def delete_asset(session: Session, s3_client, asset: Asset) -> None:
 def side_grid(session: Session, accession_id: str) -> list[dict]:
     rows = session.execute(
         text(
-            "SELECT side_id, disc, side, speed_rpm, expected_runtime_sec, state, "
-            "qc_verdict, captured_at, current_capture_id FROM v_side_status "
-            "WHERE accession_id = :a ORDER BY disc, side"
+            "SELECT v.side_id, v.disc, v.side, v.speed_rpm, v.expected_runtime_sec, "
+            "v.state, v.qc_verdict, v.captured_at, v.current_capture_id, c.bytes "
+            "FROM v_side_status v "
+            "LEFT JOIN capture c ON c.id = v.current_capture_id "
+            "WHERE v.accession_id = :a ORDER BY v.disc, v.side"
         ),
         {"a": accession_id.upper()},
     )
