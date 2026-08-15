@@ -60,7 +60,13 @@ class FakeS3:
             start = int(start_s) if start_s else 0
             end = int(end_s) if end_s else len(data) - 1
             data = data[start:end + 1]
-        return {"Body": io.BytesIO(data)}
+
+        class _Body(io.BytesIO):
+            def iter_chunks(self, chunk_size=8192):
+                while chunk := self.read(chunk_size):
+                    yield chunk
+
+        return {"Body": _Body(data)}
 
     def delete_object(self, Bucket, Key):
         self.objects.pop(Key, None)

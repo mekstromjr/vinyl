@@ -263,8 +263,6 @@ def capture_audio(
     S3 instead of downloading half a gigabyte to hear ten seconds. Totals come
     from the bytes column recorded at capture time.
     """
-    from fastapi.responses import Response
-
     from vinyl_server.db.models import Capture
 
     cap = session.get(Capture, capture_id)
@@ -293,8 +291,11 @@ def capture_audio(
             raise HTTPException(416, "Range beyond end of file")
         obj = s3.get_object(Bucket=cap.s3_bucket, Key=cap.s3_key,
                             Range=f"bytes={start}-{end}")
-        return Response(
-            content=obj["Body"].read(),
+        # STREAM the ranged body — browsers open audio with "Range: bytes=0-"
+        # (the whole file), and buffering that with .read() OOM-killed a
+        # 512Mi pod on a 487MB master. Never hold a master in memory.
+        return StreamingResponse(
+            obj["Body"].iter_chunks(1 << 20),
             status_code=206,
             media_type="audio/flac",
             headers=dict(
