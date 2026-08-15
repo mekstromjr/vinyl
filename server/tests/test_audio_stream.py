@@ -63,6 +63,18 @@ def test_open_ended_range(api):
     assert resp.content == AUDIO[-4:]
 
 
+def test_browser_opening_move_bytes_0_dash(api):
+    """Safari/Chrome open audio with an open-ended whole-file range. This must
+    stream, not buffer — buffering it OOM-killed the pod on a 487MB master."""
+    acc_id, cap_id = _uploaded_capture(api)
+    resp = api.get(
+        f"/accessions/{acc_id}/captures/{cap_id}/audio", headers={"Range": "bytes=0-"}
+    )
+    assert resp.status_code == 206
+    assert resp.content == AUDIO
+    assert resp.headers["content-range"] == f"bytes 0-{len(AUDIO) - 1}/{len(AUDIO)}"
+
+
 def test_range_beyond_eof_416(api):
     acc_id, cap_id = _uploaded_capture(api)
     resp = api.get(
