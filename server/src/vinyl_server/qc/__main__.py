@@ -57,13 +57,20 @@ def run(capture_id: uuid.UUID) -> str:
             music_end_sec=music_end,
         )
 
+        import json as _json
+
         cap.qc_verdict = result.verdict
-        cap.qc = result.report
+        # round-trip through json with numpy-scalar coercion: a leaked np type
+        # must degrade to its value, never fail the whole job at commit
+        cap.qc = _json.loads(_json.dumps(
+            result.report,
+            default=lambda o: o.item() if hasattr(o, "item") else str(o),
+        ))
         cap.lead_in_noise_floor_dbfs = noise_floor
         cap.clicks_per_min = clicks["clicks_per_min"]
         cap.peak_dbfs = summary["peak_dbfs"]
         if side.expected_runtime_sec:
-            cap.duration_delta_sec = round(music_end - side.expected_runtime_sec, 1)
+            cap.duration_delta_sec = float(round(music_end - side.expected_runtime_sec, 1))
 
         # Envelope backfill (1 s peaks from the 100 ms pass) for captures that
         # predate live envelopes — the waveform appears retroactively.
