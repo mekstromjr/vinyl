@@ -140,7 +140,9 @@ def music_bounds(envelope_100ms: list[float], level: float = 0.05) -> tuple[floa
     above = np.nonzero(smooth > level)[0]
     if len(above) == 0:
         return 0.0, len(env) / 10
-    return round(above[0] / 10, 1), round(above[-1] / 10, 1)
+    # float(): np.float64 poisons downstream comparisons into np.bool_, which
+    # json cannot serialize — the loop-scan sides all crashed on exactly this
+    return float(round(above[0] / 10, 1)), float(round(above[-1] / 10, 1))
 
 
 def lead_in_noise_floor(envelope_100ms: list[float], onset_sec: float) -> float | None:
@@ -150,7 +152,7 @@ def lead_in_noise_floor(envelope_100ms: list[float], onset_sec: float) -> float 
     lead = envelope_100ms[5 : max(onset - 5, 0)]
     if len(lead) < 20:  # under 2 s of lead-in: not measurable
         return None
-    return round(_dbfs(float(np.median(np.asarray(lead)))), 2)
+    return float(round(_dbfs(float(np.median(np.asarray(lead)))), 2))
 
 
 def dropouts(envelope_100ms: list[float], onset_sec: float, end_sec: float) -> list[float]:
@@ -161,5 +163,5 @@ def dropouts(envelope_100ms: list[float], onset_sec: float, end_sec: float) -> l
     for i, q in enumerate(quiet):
         run = run + 1 if q else 0
         if run == 5:
-            out.append(round(onset_sec + (i - 4) / 10, 1))
+            out.append(float(round(onset_sec + (i - 4) / 10, 1)))
     return out

@@ -68,6 +68,23 @@ def test_mono_candidate_noted_not_verdicted():
     assert r.report["mono_fold_candidate"] is True
 
 
+def test_report_json_serializable_with_numpy_inputs():
+    """The loop-scan sides all crashed on np.bool_/np.float64 in the JSONB
+    blob; every report must round-trip through json with numpy inputs."""
+    import json
+
+    import numpy as np
+
+    r = _judge(
+        music_end_sec=np.float64(1250.0),
+        loop={"scanned": True, "loop_at_sec": 1240.0,
+              "mid_record_loop": np.bool_(False)},
+    )
+    json.dumps(r.report, default=lambda o: o.item() if hasattr(o, "item") else str(o))
+    assert isinstance(r.report["mono_fold_candidate"], bool)
+    assert isinstance(r.report["music_end_sec"], float)
+
+
 def test_report_carries_thresholds():
     assert _judge().report["thresholds"] == THRESHOLDS
 

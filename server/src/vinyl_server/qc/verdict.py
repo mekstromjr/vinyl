@@ -42,7 +42,7 @@ def loop_scan(envelope_100ms: list[float], speed_rpm: int, music_end_sec: float)
         if det.feed(peak, (i + 1) / 10):
             fired_at = (i + 1) / 10
             break
-    mid_record = fired_at is not None and fired_at < music_end_sec - 120
+    mid_record = bool(fired_at is not None and fired_at < music_end_sec - 120)
     return {
         "scanned": True,
         "loop_at_sec": fired_at,
@@ -101,7 +101,7 @@ def judge(
             )
             verdict = "review"
 
-    mono_candidate = summary["phase_correlation"] >= t["mono_fold_candidate_corr"]
+    mono_candidate = bool(summary["phase_correlation"] >= t["mono_fold_candidate_corr"])
 
     report = {
         **summary,
@@ -109,7 +109,7 @@ def judge(
         "lead_in_noise_floor_dbfs": noise_floor_dbfs,
         "dropout_starts_sec": dropout_starts,
         "loop_scan": loop,
-        "music_end_sec": music_end_sec,
+        "music_end_sec": float(music_end_sec),
         "expected_runtime_sec": expected_runtime_sec,
         "mono_fold_candidate": mono_candidate,
         "buy_commercial_candidate": buy,
