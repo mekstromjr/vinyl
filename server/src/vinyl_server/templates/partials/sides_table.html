@@ -42,9 +42,11 @@ function drawSideWave(sideId){
   if (!env.length){ ctx.fillStyle = '#999'; ctx.fillText('no waveform recorded for this capture', 10, 20); return; }
   ctx.fillStyle = '#7a4a2b';
   const w = canvas.width / env.length, h = canvas.height;
+  // Linear amplitude normalized to the side's own peak — dB scaling makes
+  // surface noise fill half the height and the whole thing reads as a block.
+  const peak = Math.max(...env, 1e-6);
   env.forEach((v, i) => {
-    const db = v > 0 ? 20 * Math.log10(v) : -60;
-    const bar = Math.max(1, (Math.min(0, db) + 60) / 60 * h);
+    const bar = Math.max(1, (v / peak) * h);
     ctx.fillRect(i * w, (h - bar) / 2, Math.max(1, w * 0.8), bar);
   });
   canvas.onclick = e => {
