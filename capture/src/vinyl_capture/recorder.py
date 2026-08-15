@@ -25,7 +25,7 @@ import threading
 import time
 from pathlib import Path
 
-from vinyl_capture.analysis import StreamStats
+from vinyl_capture.analysis import LockedGrooveDetector, StreamStats
 
 _XRUN_RE = re.compile(rb"xrun", re.IGNORECASE)
 
@@ -33,11 +33,31 @@ _CHUNK_BYTES = 4 * 2 * 9600  # 100 ms of S32_LE stereo at 96 kHz
 
 
 class RecordingSession:
-    def __init__(self, *, device: str, sample_rate: int, out_path: Path) -> None:
+    def __init__(
+        self,
+        *,
+        device: str,
+        sample_rate: int,
+        out_path: Path,
+        rotation_period_sec: float | None = None,
+        on_loop=None,
+        loop_threshold: float = 0.96,
+        loop_revolutions: int = 10,
+    ) -> None:
         self.out_path = out_path
         self.stats = StreamStats(sample_rate=sample_rate)
         self.xruns = 0
         self.started_at = time.monotonic()
+        self.on_loop = on_loop
+        self.loop_detector = (
+            LockedGrooveDetector(
+                rotation_period_sec,
+                threshold=loop_threshold,
+                trigger_revolutions=loop_revolutions,
+            )
+            if rotation_period_sec
+            else None
+        )
         self._proc = subprocess.Popen(
             [
                 "ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "warning",
@@ -64,6 +84,12 @@ class RecordingSession:
             if not chunk:
                 return
             self.stats.feed(chunk, time.monotonic())
+            if self.loop_detector is not None:
+                peak = max(self.stats.meter_l, self.stats.meter_r)
+                if self.loop_detector.feed(peak, self.stats.duration_sec) and self.on_loop:
+                    # New thread: stop() joins this reader thread; calling it
+                    # from here would deadlock.
+                    threading.Thread(target=self.on_loop, daemon=True).start()
 
     def _read_stderr(self) -> None:
         assert self._proc.stderr is not None

@@ -114,6 +114,87 @@ class StreamStats:
         }
 
 
+class LockedGrooveDetector:
+    """Detects the stylus looping one revolution via envelope self-similarity.
+
+    Fed one peak value per ~100 ms chunk. A locked groove makes the envelope
+    periodic at exactly the rotation period (1.8 s at 33 1/3; 1.33 s at 45):
+    the last revolution's envelope correlates near-perfectly with the previous
+    one, sustained for revolution after revolution. Real music rarely holds
+    that correlation for even two revolutions.
+
+    The caller decides what a trigger MEANS — the runout groove is a locked
+    groove by design, so position relative to expected runtime separates
+    "scratch, discard" from "side finished".
+    """
+
+    def __init__(
+        self,
+        period_sec: float,
+        bucket_sec: float = 0.1,
+        threshold: float = 0.96,
+        min_level: float = 5e-4,
+        trigger_revolutions: int = 10,
+    ) -> None:
+        self.lag = max(2, round(period_sec / bucket_sec))
+        self.threshold = threshold
+        self.min_level = min_level
+        self.trigger_revolutions = trigger_revolutions
+        self.buckets: list[float] = []
+        self.matching_buckets = 0
+        self.loop_started_at_sec: float | None = None
+        self.triggered = False
+
+    @staticmethod
+    def _correlate(a: list[float], b: list[float]) -> float:
+        n = len(a)
+        ma, mb = sum(a) / n, sum(b) / n
+        va = sum((x - ma) ** 2 for x in a)
+        vb = sum((x - mb) ** 2 for x in b)
+        if va < 1e-12 or vb < 1e-12:
+            # Flat envelopes: identical loud plateaus count as similar; silence
+            # (both flat AND quiet) must not.
+            return 1.0 if abs(ma - mb) < 1e-6 else 0.0
+        cov = sum((x - ma) * (y - mb) for x, y in zip(a, b, strict=True))
+        return cov / (va * vb) ** 0.5
+
+    def feed(self, peak: float, at_sec: float) -> bool:
+        """Returns True exactly once, when the trigger threshold is crossed."""
+        self.buckets.append(peak)
+        if len(self.buckets) > 2 * self.lag:
+            del self.buckets[: len(self.buckets) - 2 * self.lag]
+        if self.triggered or len(self.buckets) < 2 * self.lag:
+            return False
+
+        recent = self.buckets[self.lag:]
+        previous = self.buckets[: self.lag]
+        level = sum(recent) / len(recent)
+        similar = (
+            level >= self.min_level
+            and self._correlate(recent, previous) >= self.threshold
+        )
+        if similar:
+            self.matching_buckets += 1
+            if self.loop_started_at_sec is None:
+                self.loop_started_at_sec = max(0.0, at_sec - 2 * self.lag * 0.1)
+        else:
+            self.matching_buckets = 0
+            self.loop_started_at_sec = None
+
+        if self.matching_buckets >= self.trigger_revolutions * self.lag:
+            self.triggered = True
+            return True
+        return False
+
+    @property
+    def revolutions(self) -> float:
+        return self.matching_buckets / self.lag
+
+
+#: Rotation period by nominal RPM (33 means 33-1/3 — 60/33 would be wrong).
+ROTATION_PERIOD_SEC = {33: 1.8, 45: 60 / 45, 78: 60 / 78}
+
+
 @dataclass
 class IntegrityVerdict:
     passed: bool
@@ -129,6 +210,8 @@ def judge(
     min_duration_sec: float = 30.0,
     clip_limit: int = 50,
     dc_limit: float = 0.01,
+    locked_groove: bool = False,
+    loop_started_at_sec: float | None = None,
 ) -> IntegrityVerdict:
     """Recording-integrity verdict. The test for what belongs here: would
     redoing the capture change this number? (Surface noise wouldn't — that's
@@ -138,6 +221,14 @@ def judge(
     MECHANICALLY broken, not records that sound bad.
     """
     reasons = []
+    if locked_groove:
+        at = ""
+        if loop_started_at_sec is not None:
+            at = f" at ~{int(loop_started_at_sec // 60)}:{int(loop_started_at_sec % 60):02d}"
+        reasons.append(
+            f"locked groove{at} — the stylus looped the same revolution; "
+            "clean the record and re-try"
+        )
     if xruns > 0:
         # Xruns lose samples permanently; the file is unrepairable.
         reasons.append(f"{xruns} ALSA xrun(s) — samples were lost")
@@ -150,7 +241,8 @@ def judge(
     if stats_summary["duration_sec"] < min_duration_sec:
         reasons.append(f"only {stats_summary['duration_sec']:.0f}s captured")
     if (
-        expected_runtime_sec
+        not locked_groove
+        and expected_runtime_sec
         and stats_summary["duration_sec"] < expected_runtime_sec - 60
     ):
         reasons.append(
@@ -158,7 +250,12 @@ def judge(
             f"{expected_runtime_sec}s — stopped early or wrong side?"
         )
 
-    report = dict(stats_summary, xruns=xruns, expected_runtime_sec=expected_runtime_sec)
+    report = dict(
+        stats_summary,
+        xruns=xruns,
+        expected_runtime_sec=expected_runtime_sec,
+        loop_started_at_sec=loop_started_at_sec,
+    )
     return IntegrityVerdict(passed=not reasons, reasons=reasons, report=report)
 
 
