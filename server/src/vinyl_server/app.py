@@ -40,6 +40,9 @@ def create_app(
 
     app.state.discogs = discogs_client
     app.state.s3 = s3_client
+    from vinyl_server.kjob import spawn_qc_job
+
+    app.state.spawn_qc = spawn_qc_job
     app.state.s3_bucket = s3_bucket
     app.state.musicbrainz_enabled = bool(musicbrainz_enabled)
 

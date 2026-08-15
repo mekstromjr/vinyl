@@ -4,6 +4,11 @@ FROM python:3.12-slim
 # uv for fast, lockfile-faithful installs.
 COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /usr/local/bin/uv
 
+# ffmpeg: the QC job decodes masters in-cluster (roughly doubles the image;
+# accepted to keep one image / one release train)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY shared/ shared/
