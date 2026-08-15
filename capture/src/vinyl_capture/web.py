@@ -198,7 +198,10 @@ const $ = id => document.getElementById(id);
 let selected = null, lastScan = null;
 
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  $(id).classList.add('active'); }
+  $(id).classList.add('active');
+  // Leaving the review screen must SILENCE it — a hidden <audio> keeps playing.
+  if(id !== 'review'){ const a = $('v-audio');
+    if(a && a.src){ a.pause(); a.removeAttribute('src'); a.load(); } } }
 function showScan(){ show('scan'); $('code').value=''; $('code').focus(); $('scanerr').textContent=''; }
 
 async function post(path, body){ const r = await fetch(path,{method:'POST',
@@ -249,9 +252,11 @@ function drawWave(canvas, env){
   if(!env.length) { ctx.fillStyle='#666'; ctx.fillText('no waveform for this capture', 10, 20); return; }
   ctx.fillStyle = '#c9a97e';
   const w = canvas.width / env.length, h = canvas.height;
+  // Linear amplitude, normalized to this side's own loudest second: dB
+  // scaling made surface noise fill half the height (solid-block look).
+  const peak = Math.max(...env, 1e-6);
   env.forEach((v,i) => {
-    const db = v>0 ? 20*Math.log10(v) : -60;
-    const bar = Math.max(1, (Math.min(0, db) + 60) / 60 * h);
+    const bar = Math.max(1, (v / peak) * h);
     ctx.fillRect(i*w, (h-bar)/2, Math.max(1, w*0.8), bar);
   });
 }
