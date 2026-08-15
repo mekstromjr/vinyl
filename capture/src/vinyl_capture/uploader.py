@@ -32,7 +32,15 @@ def make_s3(settings: Settings):
         region_name=settings.s3_region,
         aws_access_key_id=settings.s3_access_key,
         aws_secret_access_key=settings.s3_secret_key,
-        config=Config(s3={"addressing_style": "path"}),
+        # when_required: botocore's flexible-checksum validation (1.36+)
+        # aborts reads of multipart objects on Garage — its composite checksum
+        # headers don't match botocore's expectation. Integrity is covered by
+        # our own end-to-end sha256, recorded at capture time.
+        config=Config(
+            s3={"addressing_style": "path"},
+            response_checksum_validation="when_required",
+            request_checksum_calculation="when_required",
+        ),
     )
 
 
