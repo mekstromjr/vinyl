@@ -51,5 +51,12 @@ class VinylApi:
     def report_upload_error(self, capture_id: str, error: str) -> None:
         self._req("POST", f"/api/captures/{capture_id}/upload-error", json={"error": error[:500]})
 
+    def clear_expected_runtime(self, side_id: str) -> None:
+        accession_id = side_id.rsplit("-", 2)[0]
+        self._req(
+            "PATCH", f"/api/accessions/{accession_id}/sides/{side_id}",
+            json={"clear_expected_runtime": True},
+        )
+
     def capture(self, capture_id: str) -> dict:
         return self._req("GET", f"/api/captures/{capture_id}")

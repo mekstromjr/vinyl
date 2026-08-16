@@ -41,6 +41,7 @@ class RecordingSession:
         out_path: Path,
         rotation_period_sec: float | None = None,
         on_loop=None,
+        on_xrun=None,
         loop_threshold: float = 0.96,
         loop_revolutions: int = 10,
     ) -> None:
@@ -49,6 +50,7 @@ class RecordingSession:
         self.xruns = 0
         self.started_at = time.monotonic()
         self.on_loop = on_loop
+        self.on_xrun = on_xrun
         self.loop_detector = (
             LockedGrooveDetector(
                 rotation_period_sec,
@@ -96,6 +98,10 @@ class RecordingSession:
         for line in self._proc.stderr:
             if _XRUN_RE.search(line):
                 self.xruns += 1
+                if self.xruns == 1 and self.on_xrun:
+                    # Samples are already lost; the capture is unrecoverable.
+                    # Fail NOW, not 16 minutes later at the timer.
+                    threading.Thread(target=self.on_xrun, daemon=True).start()
             self._stderr_tail = (self._stderr_tail + [line.strip()])[-10:]
 
     @property

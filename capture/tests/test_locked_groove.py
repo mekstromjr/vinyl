@@ -89,6 +89,22 @@ def test_judge_locked_groove_fails_with_cleaning_advice():
     assert "clean the record" in v.reasons[0]
 
 
+def test_judge_truncation_fails_with_self_heal_message():
+    """Timer fired while music still played: without this the capture PASSES
+    (duration exceeds expected) with the end of the side missing."""
+    v = judge(
+        {"duration_sec": 973.0, "clipped_samples": 0, "dc_offset_l": 0.0,
+         "dc_offset_r": 0.0, "peak_dbfs_l": -0.6, "peak_dbfs_r": -0.7,
+         "envelope_1s": []},
+        xruns=0,
+        expected_runtime_sec=817,
+        music_at_end=True,
+    )
+    assert not v.passed
+    assert "still playing" in v.reasons[0]
+    assert "open-ended" in v.reasons[0]
+
+
 def test_judge_runout_stop_passes():
     v = judge(
         {"duration_sec": 1210.0, "clipped_samples": 0, "dc_offset_l": 0.0,

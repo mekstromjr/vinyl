@@ -66,3 +66,19 @@ def test_sides_table_shows_size_once_captured(api):
     # API surface carries it too
     grid = api.get(f"/api/accessions/{acc_id}/sides").json()
     assert next(s for s in grid if s["side_id"] == side_id)["bytes"] == 486889419
+
+
+def test_clear_expected_runtime_flag(api):
+    """The truncation self-heal path: a wrong Discogs runtime gets cleared so
+    the retry runs open-ended."""
+    acc_id = _bound_accession(api)
+    side_id = f"{acc_id}-D1-A"
+    grid = api.get(f"/api/accessions/{acc_id}/sides").json()
+    assert next(s for s in grid if s["side_id"] == side_id)["expected_runtime_sec"]
+
+    resp = api.patch(
+        f"/api/accessions/{acc_id}/sides/{side_id}",
+        json={"clear_expected_runtime": True},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["expected_runtime_sec"] is None

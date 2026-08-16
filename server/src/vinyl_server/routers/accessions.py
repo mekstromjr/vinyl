@@ -151,6 +151,8 @@ def patch_side(
         side.track_positions = body.track_positions
     if body.expected_runtime_sec is not None:
         side.expected_runtime_sec = body.expected_runtime_sec
+    if body.clear_expected_runtime:
+        side.expected_runtime_sec = None
     if body.skipped is not None:
         side.status = SideStatus.SKIPPED if body.skipped else SideStatus.PENDING
         side.skip_reason = body.skip_reason if body.skipped else None

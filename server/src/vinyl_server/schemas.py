@@ -32,6 +32,8 @@ class BindRequest(BaseModel):
 
 class SidePatch(BaseModel):
     speed_rpm: Speed | None = None
+    #: Explicit clear: None means "not provided" for every other field here.
+    clear_expected_runtime: bool = False
     track_positions: list[str] | None = None
     expected_runtime_sec: int | None = Field(default=None, gt=0)
     skipped: bool | None = None
