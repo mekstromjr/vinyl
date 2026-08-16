@@ -30,10 +30,24 @@ class FakeS3:
         self.objects = {}
         self.fail = fail
 
-    def upload_file(self, Filename, Bucket, Key, ExtraArgs=None, Config=None):
+    def create_multipart_upload(self, Bucket, Key, ContentType=None):
         if self.fail:
             raise RuntimeError("simulated network EOF")
-        self.objects[Key] = pathlib.Path(Filename).read_bytes()
+        self.mpu_aborted = False
+        self.parts = []
+        return {"UploadId": "mpu-1"}
+
+    def upload_part(self, Bucket, Key, UploadId, PartNumber, Body):
+        if self.fail:
+            raise RuntimeError("simulated network EOF")
+        self.parts.append(Body)
+        return {"ETag": f"etag-{PartNumber}"}
+
+    def complete_multipart_upload(self, Bucket, Key, UploadId, MultipartUpload):
+        self.objects[Key] = b"".join(self.parts)
+
+    def abort_multipart_upload(self, Bucket, Key, UploadId):
+        self.mpu_aborted = True
 
     def put_object(self, Bucket, Key, Body, ContentType=None):
         if self.fail:
@@ -121,3 +135,24 @@ def test_unrecognized_files_left_alone(tmp_path):
     up = Uploader(Cfg(tmp_path), FakeApi({}), FakeStation())
     up._drain()
     assert stray.exists()
+
+
+def test_arm_mid_upload_yields_and_retains_file(stage):
+    """The GM-0010-D1-A xrun: a 600MB upload kept running after an arm. The
+    phase gate must stop within one part and keep the file for later."""
+    f, api, up = stage()
+
+    class FlippingStation:
+        def __init__(self):
+            self.calls = 0
+
+        @property
+        def phase(self):
+            self.calls += 1
+            return "idle" if self.calls <= 1 else "recording"
+
+    up.station = FlippingStation()
+    up._drain()
+    assert f.exists(), "file must be retained for the next idle window"
+    assert api.uploaded == [], "upload must not be marked complete"
+    assert up._s3.mpu_aborted, "the multipart upload must be aborted, not leaked"

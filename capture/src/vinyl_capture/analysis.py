@@ -165,7 +165,11 @@ def judge(
         )
     if xruns > 0:
         # Xruns lose samples permanently; the file is unrepairable.
-        reasons.append(f"{xruns} ALSA xrun(s) — samples were lost")
+        reasons.append(
+            f"{xruns} ALSA xrun(s) — samples were lost. This is the COMPUTER "
+            "being too busy (usually an upload finishing), never the record. "
+            "Wait a minute and record this side again"
+        )
     if stats_summary["clipped_samples"] > clip_limit:
         reasons.append(
             f"{stats_summary['clipped_samples']} clipped samples — gain too hot"
