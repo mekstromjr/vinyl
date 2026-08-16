@@ -157,6 +157,7 @@ class Station:
             status=status,
             failure_reason="; ".join(verdict.reasons) or None,
             integrity=dict(verdict.report, stop_reason=reason,
+                           loop_diag=loop.diagnostics() if loop else None,
                            stderr_tail=session.stderr_tail() or None),
             sha256=sha,
             bytes=size,

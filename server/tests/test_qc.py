@@ -85,6 +85,12 @@ def test_report_json_serializable_with_numpy_inputs():
     assert isinstance(r.report["music_end_sec"], float)
 
 
+def test_reasons_persisted_in_report():
+    """The phone notification is ephemeral; the WHY must live in the blob."""
+    r = _judge(noise_floor_dbfs=-30.0)
+    assert r.report["reasons"] and "noise floor" in r.report["reasons"][0]
+
+
 def test_report_carries_thresholds():
     assert _judge().report["thresholds"] == THRESHOLDS
 

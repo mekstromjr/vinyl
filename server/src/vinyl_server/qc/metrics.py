@@ -156,7 +156,12 @@ def lead_in_noise_floor(envelope_100ms: list[float], onset_sec: float) -> float 
 
 
 def dropouts(envelope_100ms: list[float], onset_sec: float, end_sec: float) -> list[float]:
-    """Sudden near-silence inside the music region (>=0.5 s below -60 dBFS)."""
+    """Sudden near-silence inside the music region (>=0.5 s below -60 dBFS).
+
+    A 5 s grace after onset: the smoothed music boundary can land at zero and
+    sweep the capture's opening silence into "the music region" (GM-0010-D1-B
+    was flagged for a dropout at t=1.0)."""
+    onset_sec = onset_sec + 5
     env = np.asarray(envelope_100ms[int(onset_sec * 10) : int(end_sec * 10)])
     quiet = env < 0.001
     out, run = [], 0
