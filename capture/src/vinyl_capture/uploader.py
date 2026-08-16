@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import subprocess
 import threading
 from pathlib import Path
 
 import boto3
-from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 
 from vinyl_capture.apiclient import ApiError, VinylApi
@@ -46,12 +46,16 @@ def make_s3(settings: Settings):
 
 def flac_verify(path: Path) -> bool:
     """Full decode test. Result is cached as a sibling marker so a file that
-    fails upload three times is only decode-verified once."""
+    fails upload three times is only decode-verified once.
+
+    nice+ionice: decoding 600MB on a Core 2 Duo starved the RECORDER once
+    (xrun during GM-0010-D1-A) when a capture was armed mid-verify."""
     marker = path.with_suffix(".verified")
     if marker.exists():
         return True
     ok = subprocess.run(
-        ["flac", "-t", "-s", str(path)], capture_output=True
+        ["nice", "-n", "19", "ionice", "-c", "3", "flac", "-t", "-s", str(path)],
+        capture_output=True,
     ).returncode == 0
     if ok:
         marker.touch()
@@ -70,6 +74,10 @@ class Uploader:
         threading.Thread(target=self._loop, daemon=True).start()
 
     def _loop(self) -> None:
+        # Lowest CPU priority for everything this thread does: recording
+        # always wins the two cores.
+        with contextlib.suppress(OSError):
+            os.setpriority(os.PRIO_PROCESS, 0, 19)
         while not self._stop.wait(10):
             if self.station.phase != "idle":
                 continue  # NEVER touch the disk while a capture might be running
@@ -118,16 +126,13 @@ class Uploader:
         if self._s3 is None:
             self._s3 = make_s3(self.settings)
         try:
-            # Multipart with per-part retry: a network blip costs one 16 MB
-            # part, not the whole half-gigabyte master.
-            self._s3.upload_file(
-                str(path), self.settings.s3_bucket, key,
-                ExtraArgs={"ContentType": "audio/flac"},
-                Config=TransferConfig(
-                    multipart_threshold=32 * 1024 * 1024,
-                    multipart_chunksize=16 * 1024 * 1024,
-                ),
-            )
+            # Manual multipart, 16 MB parts, PHASE-GATED BETWEEN PARTS: an arm
+            # mid-upload stops us within one part (~seconds). boto3's
+            # upload_file could not be interrupted, and a 600 MB transfer
+            # during a capture starved the recorder into an xrun.
+            if not self._upload_interruptible(path, key):
+                log.info("capture armed mid-upload; %s deferred", path.name)
+                return
             self.api.mark_uploaded(capture_id, self.settings.s3_bucket, key)
         except Exception as exc:
             with contextlib.suppress(ApiError):
@@ -138,6 +143,42 @@ class Uploader:
         path.unlink(missing_ok=True)
         path.with_suffix(".verified").unlink(missing_ok=True)
         log.info("uploaded %s -> %s", path.name, key)
+
+    def _upload_interruptible(self, path: Path, key: str) -> bool:
+        """True = completed; False = yielded to a capture (file retained)."""
+        bucket = self.settings.s3_bucket
+        part_size = 16 * 1024 * 1024
+        mpu = self._s3.create_multipart_upload(
+            Bucket=bucket, Key=key, ContentType="audio/flac"
+        )
+        upload_id = mpu["UploadId"]
+        parts = []
+        try:
+            with path.open("rb") as f:
+                n = 1
+                while chunk := f.read(part_size):
+                    if self.station.phase != "idle":
+                        self._s3.abort_multipart_upload(
+                            Bucket=bucket, Key=key, UploadId=upload_id
+                        )
+                        return False
+                    resp = self._s3.upload_part(
+                        Bucket=bucket, Key=key, UploadId=upload_id,
+                        PartNumber=n, Body=chunk,
+                    )
+                    parts.append({"PartNumber": n, "ETag": resp["ETag"]})
+                    n += 1
+            self._s3.complete_multipart_upload(
+                Bucket=bucket, Key=key, UploadId=upload_id,
+                MultipartUpload={"Parts": parts},
+            )
+            return True
+        except Exception:
+            with contextlib.suppress(Exception):
+                self._s3.abort_multipart_upload(
+                    Bucket=bucket, Key=key, UploadId=upload_id
+                )
+            raise
 
     def stop(self) -> None:
         self._stop.set()
