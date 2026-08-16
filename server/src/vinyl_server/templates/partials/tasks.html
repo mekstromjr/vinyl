@@ -1,6 +1,6 @@
 <div style="margin-bottom:.6rem">
   {% for key, label in [("all","All"), ("recapture","Recapture"), ("review","Review"),
-                        ("capture","Capture"), ("identify","Identify"), ("qc_pending","QC pending")] %}
+                        ("capture","Capture"), ("identify","Identify"), ("uploading","Uploading"), ("qc_pending","QC pending")] %}
   <button type="button" class="{{ 'secondary' if active != key }}"
           style="margin:.15rem .2rem;padding:.35rem .8rem;font-size:.9rem"
           hx-get="/tasks?type={{ key }}" hx-target="#tasks" hx-swap="innerHTML">

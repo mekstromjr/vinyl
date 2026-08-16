@@ -120,6 +120,7 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
             """
             SELECT v.side_id, v.state, v.speed_rpm, a.accession_id, a.status AS acc_status,
                    r.artist, r.title, c.failure_reason,
+                   c.upload_attempts, substring(c.upload_error for 80) AS upload_error,
                    c.qc->'reasons' AS qc_reasons,
                    (c.qc->>'buy_commercial_candidate')::boolean AS buy
             FROM v_side_status v
@@ -164,6 +165,13 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
             tasks.append({"type": "capture", "id": row.side_id,
                           "accession_id": row.accession_id, "title": title,
                           "detail": "not yet captured"})
+        elif row.state == "captured":
+            detail = "captured, waiting to upload from the station"
+            if row.upload_attempts:
+                detail += f" ({row.upload_attempts} failed attempts: {row.upload_error or '?'})"
+            tasks.append({"type": "uploading", "id": row.side_id,
+                          "accession_id": row.accession_id, "title": title,
+                          "detail": detail})
         elif row.state == "qc_pending":
             tasks.append({"type": "qc_pending", "id": row.side_id,
                           "accession_id": row.accession_id, "title": title,
@@ -174,7 +182,8 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
                       "title": row.condition_notes or "(no notes)",
                       "detail": "bind a Discogs release or mark unidentifiable"})
 
-    order = {"recapture": 0, "review": 1, "capture": 2, "identify": 3, "qc_pending": 4}
+    order = {"recapture": 0, "review": 1, "capture": 2, "identify": 3,
+             "uploading": 4, "qc_pending": 5}
     tasks.sort(key=lambda t: (order[t["type"]], t["id"]))
     counts = {k: sum(1 for t in tasks if t["type"] == k) for k in order}
     if type != "all":
