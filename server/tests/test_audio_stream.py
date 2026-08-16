@@ -109,7 +109,8 @@ def test_qc_panel_renders_verdict_and_reasons(api):
     from vinyl_server.db.session import get_session
     # write a verdict directly (the QC job path is exercised elsewhere)
     override = api.app.dependency_overrides[get_session]
-    gen = override(); session = next(gen)
+    gen = override()
+    session = next(gen)
     cap = session.get(Capture, uuid.UUID(cap_id))
     cap.qc_verdict = "review"
     cap.qc = {"reasons": ["41.0 clicks/min — surface damage"],
