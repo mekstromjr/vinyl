@@ -58,9 +58,21 @@ def _accession_context(request: Request, session: Session, accession_id: str, **
     if cap_ids:
         for cap in session.scalars(select(Capture).where(Capture.id.in_(cap_ids))):
             if cap.s3_key:
+                qc = cap.qc or {}
                 listen[cap.side_id] = {
                     "capture_id": str(cap.id),
                     "envelope": (cap.integrity or {}).get("envelope_1s") or [],
+                    "qc": {
+                        "verdict": cap.qc_verdict,
+                        "reasons": qc.get("reasons") or [],
+                        "noise": cap.lead_in_noise_floor_dbfs,
+                        "cpm": cap.clicks_per_min,
+                        "peak": cap.peak_dbfs,
+                        "imbalance": qc.get("channel_imbalance_db"),
+                        "dropouts": qc.get("dropout_starts_sec") or [],
+                        "mono": qc.get("mono_fold_candidate"),
+                        "buy": qc.get("buy_commercial_candidate"),
+                    } if cap.qc_verdict else None,
                 }
     return {
         "username": _username(request),

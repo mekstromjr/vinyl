@@ -104,6 +104,7 @@ def judge(
     mono_candidate = bool(summary["phase_correlation"] >= t["mono_fold_candidate_corr"])
 
     report = {
+        "reasons": reasons,
         **summary,
         **clicks,
         "lead_in_noise_floor_dbfs": noise_floor_dbfs,

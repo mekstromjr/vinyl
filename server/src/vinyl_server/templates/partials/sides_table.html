@@ -20,6 +20,23 @@
               height="80" style="width:100%;background:#141210;border-radius:8px;cursor:pointer"></canvas>
       <audio id="audio-{{ s.side_id }}" controls preload="none" style="width:100%;margin-top:.4rem"
              src="/accessions/{{ s.side_id.rsplit('-', 2)[0] }}/captures/{{ listen[s.side_id].capture_id }}/audio"></audio>
+      {% set qc = listen[s.side_id].qc %}
+      {% if qc %}
+      <div class="muted" style="margin-top:.5rem;font-size:.9rem">
+        <strong>QC: <span class="badge qc_{{ qc.verdict }}">{{ qc.verdict }}</span></strong>
+        {% if qc.buy %} · flagged: consider a commercial copy{% endif %}<br>
+        {% if qc.reasons %}{% for reason in qc.reasons %}{{ reason }}<br>{% endfor %}{% endif %}
+        {% if qc.noise is not none %}lead-in floor {{ qc.noise }} dBFS · {% endif %}
+        {% if qc.cpm is not none %}{{ qc.cpm }} clicks/min · {% endif %}
+        {% if qc.peak is not none %}peak {{ qc.peak }} dBFS · {% endif %}
+        {% if qc.imbalance is not none %}imbalance {{ qc.imbalance }} dB{% endif %}
+        {% if qc.mono %} · mono pressing candidate{% endif %}
+        {% if qc.dropouts %}<br>dropouts at:
+          {% for dsec in qc.dropouts %}
+          <a href="#" onclick="var a=document.getElementById('audio-{{ s.side_id }}');a.currentTime={{ dsec }};a.play();return false">{{ (dsec // 60) | int }}:{{ "%02d" | format((dsec % 60) | int) }}</a>
+          {% endfor %}{% endif %}
+      </div>
+      {% endif %}
     </td>
   </tr>
   {% endif %}

@@ -53,6 +53,10 @@ class LockedGrooveDetector:
         self.music_seen = False
         self.loop_started_at_sec: float | None = None
         self.triggered = False
+        # Field diagnostics: what did this detector actually SEE? Recorded
+        # into the integrity blob so a non-firing detector explains itself.
+        self.best_corr = 0.0
+        self.total_hit_buckets = 0
 
     @staticmethod
     def _correlate(a: list[float], b: list[float]) -> float:
@@ -89,7 +93,11 @@ class LockedGrooveDetector:
             for lag in self.lags
             if len(self.buckets) >= self.lag + lag
         )
-        self.hits.append(best >= self.threshold and level >= self.min_level)
+        self.best_corr = max(self.best_corr, best)
+        ok = best >= self.threshold and level >= self.min_level
+        if ok:
+            self.total_hit_buckets += 1
+        self.hits.append(ok)
         if len(self.hits) > self.window_size:
             self.hits.pop(0)
 
@@ -98,6 +106,16 @@ class LockedGrooveDetector:
             self.loop_started_at_sec = max(0.0, at_sec - self.window_size * 0.1)
             return True
         return False
+
+    def diagnostics(self) -> dict:
+        return {
+            "armed": self.music_seen,
+            "best_corr": round(self.best_corr, 4),
+            "hit_buckets": self.total_hit_buckets,
+            "lag": self.lag,
+            "threshold": self.threshold,
+            "triggered": self.triggered,
+        }
 
     @property
     def revolutions(self) -> float:

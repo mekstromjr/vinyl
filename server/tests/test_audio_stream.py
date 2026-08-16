@@ -99,3 +99,26 @@ def test_listen_control_renders_for_uploaded_side(api):
     assert "Listen" in page.text
     assert cap_id in page.text
     assert "data-envelope" in page.text
+
+
+def test_qc_panel_renders_verdict_and_reasons(api):
+    acc_id, cap_id = _uploaded_capture(api)
+    import uuid
+
+    from vinyl_server.db.models import Capture
+    from vinyl_server.db.session import get_session
+    # write a verdict directly (the QC job path is exercised elsewhere)
+    override = api.app.dependency_overrides[get_session]
+    gen = override()
+    session = next(gen)
+    cap = session.get(Capture, uuid.UUID(cap_id))
+    cap.qc_verdict = "review"
+    cap.qc = {"reasons": ["41.0 clicks/min — surface damage"],
+              "channel_imbalance_db": 1.0, "dropout_starts_sec": [61.5],
+              "mono_fold_candidate": False, "buy_commercial_candidate": True}
+    cap.clicks_per_min = 41.0
+    session.commit()
+    page = api.get(f"/accessions/{acc_id}")
+    assert "surface damage" in page.text
+    assert "consider a commercial copy" in page.text
+    assert "1:01" in page.text  # clickable dropout timestamp
