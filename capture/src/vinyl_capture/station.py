@@ -77,6 +77,7 @@ class Station:
                 out_path=out,
                 rotation_period_sec=ROTATION_PERIOD_SEC.get(side["speed_rpm"]),
                 on_loop=self._on_loop,
+                on_xrun=self._on_xrun,
             )
             self.side = side
             self.capture_id = cap["id"]
@@ -99,6 +100,10 @@ class Station:
     def _auto_stop(self) -> None:
         with contextlib.suppress(RuntimeError):  # operator beat the timer to it
             self.stop(reason="timer")
+
+    def _on_xrun(self) -> None:
+        with contextlib.suppress(RuntimeError):
+            self.stop(reason="xrun")
 
     def _on_loop(self) -> None:
         """The stylus is looping one revolution. Position decides the meaning:
@@ -129,12 +134,19 @@ class Station:
 
         summary = session.stats.summary()
         loop = session.loop_detector
+        env_tail = summary.get("envelope_1s", [])[-5:]
+        music_at_end = (
+            reason == "timer"
+            and len(env_tail) == 5
+            and sum(env_tail) / 5 > 0.05
+        )
         verdict = judge(
             summary,
             xruns=session.xruns,
             expected_runtime_sec=(side or {}).get("expected_runtime_sec"),
             locked_groove=(reason == "locked_groove"),
             loop_started_at_sec=loop.loop_started_at_sec if loop else None,
+            music_at_end=music_at_end,
         )
         sha = _sha256(session.out_path) if session.out_path.exists() else None
         size = session.out_path.stat().st_size if session.out_path.exists() else None
@@ -157,6 +169,10 @@ class Station:
         if status == "failed":
             # A rejected capture never uploads; the file is worthless.
             session.out_path.unlink(missing_ok=True)
+        if music_at_end and side:
+            # Self-heal the bad metadata: the retry must run open-ended.
+            with contextlib.suppress(Exception):
+                self.api.clear_expected_runtime(side["side_id"])
 
         with self._lock:
             self.phase = "review"

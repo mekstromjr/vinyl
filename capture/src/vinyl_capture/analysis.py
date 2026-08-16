@@ -136,6 +136,7 @@ def judge(
     dc_limit: float = 0.01,
     locked_groove: bool = False,
     loop_started_at_sec: float | None = None,
+    music_at_end: bool = False,
 ) -> IntegrityVerdict:
     """Recording-integrity verdict. The test for what belongs here: would
     redoing the capture change this number? (Surface noise wouldn't — that's
@@ -145,6 +146,15 @@ def judge(
     MECHANICALLY broken, not records that sound bad.
     """
     reasons = []
+    if music_at_end:
+        # The timer fired while music was still playing: the expected runtime
+        # was WRONG (Discogs undershot GM-0010-D1-B by 3+ minutes) and the
+        # master is missing the end of the side. Without this check the
+        # capture would pass everything — duration EXCEEDS expected.
+        reasons.append(
+            "capture ended while music was still playing — expected runtime is "
+            "wrong; cleared it so the retry runs open-ended (hard cap + runout stop)"
+        )
     if locked_groove:
         at = ""
         if loop_started_at_sec is not None:

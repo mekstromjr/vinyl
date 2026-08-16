@@ -51,7 +51,9 @@ def settings() -> Settings:
         staging_dir=Path(_env("VINYL_STAGING_DIR", "/var/lib/vinyl-capture/staging")),
         alsa_device=_env("VINYL_ALSA_DEVICE", "hw:USB"),
         sample_rate=int(_env("VINYL_SAMPLE_RATE", "96000")),
-        stop_buffer_sec=int(_env("VINYL_STOP_BUFFER_SEC", "180")),
+        # 360s: the timer is a SAFETY NET behind runout detection now, and a tight
+        # buffer truncated GM-0010-D1-B when Discogs undershot the runtime.
+        stop_buffer_sec=int(_env("VINYL_STOP_BUFFER_SEC", "360")),
         hard_cap_sec_33=int(_env("VINYL_HARD_CAP_33", str(35 * 60))),
         hard_cap_sec_45=int(_env("VINYL_HARD_CAP_45", str(15 * 60))),
         s3_endpoint=_env("VINYL_S3_ENDPOINT", "https://s3.meklab.net"),
