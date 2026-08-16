@@ -14,6 +14,8 @@ import logging
 import os
 import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from pathlib import Path
 
 import boto3
@@ -38,6 +40,12 @@ def make_s3(settings: Settings):
         # our own end-to-end sha256, recorded at capture time.
         config=Config(
             s3={"addressing_style": "path"},
+            # explicit, short: the default socket behavior left a sendall
+            # blocked for SIX HOURS on a stalled connection (py-spy showed
+            # the uploader thread wedged in ssl.py send)
+            connect_timeout=10,
+            read_timeout=60,
+            retries={"mode": "standard", "max_attempts": 2},
             response_checksum_validation="when_required",
             request_checksum_calculation="when_required",
         ),
@@ -63,12 +71,31 @@ def flac_verify(path: Path) -> bool:
 
 
 class Uploader:
+    #: A part that makes no progress for this long is declared wedged; the
+    #: client is torn down (which unblocks the stuck socket) and rebuilt.
+    PART_DEADLINE_SEC = 180
+
     def __init__(self, settings: Settings, api: VinylApi, station) -> None:
         self.settings = settings
         self.api = api
         self.station = station
         self._s3 = None
         self._stop = threading.Event()
+        self._part_pool = ThreadPoolExecutor(max_workers=1)
+        #: Live status for the kiosk: what is uploading, how far along.
+        self.current: dict | None = None
+        self.last_error: str | None = None
+        self.last_success_at: float | None = None
+
+    def status(self) -> dict:
+        staged = sorted(f.name for f in self.settings.staging_dir.glob("*.flac"))
+        return {
+            "staged": len(staged),
+            "staged_files": staged[:20],
+            "current": self.current,
+            "last_error": self.last_error,
+            "last_success_at": self.last_success_at,
+        }
 
     def start(self) -> None:
         threading.Thread(target=self._loop, daemon=True).start()
@@ -145,9 +172,15 @@ class Uploader:
         log.info("uploaded %s -> %s", path.name, key)
 
     def _upload_interruptible(self, path: Path, key: str) -> bool:
-        """True = completed; False = yielded to a capture (file retained)."""
+        """True = completed; False = yielded to a capture (file retained).
+
+        Every part runs under a hard deadline: if the socket wedges (observed:
+        sendall blocked six hours on a stalled connection), the client is
+        closed — which raises inside the stuck call — and rebuilt, the MPU is
+        abandoned, and the file waits for the next pass."""
         bucket = self.settings.s3_bucket
         part_size = 16 * 1024 * 1024
+        total_parts = max(1, (path.stat().st_size + part_size - 1) // part_size)
         mpu = self._s3.create_multipart_upload(
             Bucket=bucket, Key=key, ContentType="audio/flac"
         )
@@ -161,19 +194,45 @@ class Uploader:
                         self._s3.abort_multipart_upload(
                             Bucket=bucket, Key=key, UploadId=upload_id
                         )
+                        self.current = None
                         return False
-                    resp = self._s3.upload_part(
+                    self.current = {
+                        "file": path.name, "part": n, "parts_total": total_parts
+                    }
+                    future = self._part_pool.submit(
+                        self._s3.upload_part,
                         Bucket=bucket, Key=key, UploadId=upload_id,
                         PartNumber=n, Body=chunk,
                     )
+                    try:
+                        resp = future.result(timeout=self.PART_DEADLINE_SEC)
+                    except FuturesTimeout:
+                        # Unblock the wedged socket by tearing the client down,
+                        # then rebuild for the abort + future passes.
+                        with contextlib.suppress(Exception):
+                            self._s3.close()
+                        self._s3 = make_s3(self.settings)
+                        self._part_pool.shutdown(wait=False, cancel_futures=True)
+                        self._part_pool = ThreadPoolExecutor(max_workers=1)
+                        raise TimeoutError(
+                            f"part {n}/{total_parts} made no progress for "
+                            f"{self.PART_DEADLINE_SEC}s — connection wedged"
+                        ) from None
                     parts.append({"PartNumber": n, "ETag": resp["ETag"]})
                     n += 1
             self._s3.complete_multipart_upload(
                 Bucket=bucket, Key=key, UploadId=upload_id,
                 MultipartUpload={"Parts": parts},
             )
+            self.current = None
+            import time as _time
+
+            self.last_success_at = _time.time()
+            self.last_error = None
             return True
-        except Exception:
+        except Exception as exc:
+            self.current = None
+            self.last_error = str(exc)[:200]
             with contextlib.suppress(Exception):
                 self._s3.abort_multipart_upload(
                     Bucket=bucket, Key=key, UploadId=upload_id

@@ -139,3 +139,18 @@ def test_home_hosts_task_list_not_backlog(api):
     home = api.get("/")
     assert 'hx-get="/tasks"' in home.text
     assert "Uncaptured backlog" not in home.text
+
+
+def test_task_list_shows_uploading(api):
+    """12 masters sat on the laptop for 6 hours with nobody the wiser; a
+    captured-not-uploaded side is now a visible task."""
+    acc_id = _bound_accession(api)
+    side_id = f"{acc_id}-D1-A"
+    cap = api.post("/api/captures", json={"side_id": side_id}).json()
+    api.patch(f"/api/captures/{cap['id']}", json={"status": "captured", "bytes": 10})
+    api.post(f"/api/captures/{cap['id']}/upload-error", json={"error": "sendall wedged"})
+
+    resp = api.get("/tasks", params={"type": "uploading"})
+    assert side_id in resp.text
+    assert "waiting to upload" in resp.text
+    assert "sendall wedged" in resp.text

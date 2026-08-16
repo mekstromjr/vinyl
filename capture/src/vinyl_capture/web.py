@@ -45,7 +45,7 @@ def create_app(station: Station | None = None, api: VinylApi | None = None) -> F
 
     @app.get("/status")
     def status():
-        return station.status()
+        return dict(station.status(), uploads=uploader.status())
 
     @app.post("/scan")
     def scan(body: ScanBody):
@@ -153,6 +153,9 @@ _PAGE = """<!doctype html>
   .countdown { color:#8a8378; font-size:1.1rem; }
   .err { color:#ff8f86; min-height:1.4rem; }
 </style></head><body><main>
+
+<div id="uploads" style="position:fixed;bottom:0;left:0;right:0;background:#0d0b09;
+     color:#8a8378;font-size:.95rem;padding:.4rem 1.2rem;display:none"></div>
 
 <div id="scan" class="screen active">
   <h1>Scan the card (or type the accession number)</h1>
@@ -272,6 +275,16 @@ function drawMeter(el, lin, hold){
 setInterval(async () => {
   try {
     const st = await (await fetch('/status')).json();
+    const up = st.uploads || {};
+    const bar = $('uploads');
+    if (up.staged > 0 || up.current) {
+      bar.style.display = 'block';
+      let msg = up.staged + ' side' + (up.staged === 1 ? '' : 's') + ' waiting to upload';
+      if (up.current) msg += ' — ' + up.current.file.split('__')[0] +
+        ' part ' + up.current.part + '/' + up.current.parts_total;
+      if (up.last_error && !up.current) msg += ' — last error: ' + up.last_error;
+      bar.textContent = msg;
+    } else { bar.style.display = 'none'; }
     if(st.phase === 'recording'){
       if(!$('rec').classList.contains('active')) show('rec');
       $('r-side').textContent = st.side ? st.side.side_id : '';
