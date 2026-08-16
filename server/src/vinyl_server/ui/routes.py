@@ -91,20 +91,6 @@ def home(request: Request, session: Session = Depends(get_session)):
     prefix, next_number = session.execute(
         text("SELECT prefix, next_number FROM collection ORDER BY prefix LIMIT 1")
     ).first()
-    uncaptured = session.execute(
-        text(
-            """
-            SELECT v.accession_id, v.artist, v.title,
-                   count(*) FILTER (WHERE v.state = 'pending') AS pending_sides,
-                   count(*) AS total_sides
-            FROM v_side_status v
-            WHERE v.accession_status = 'identified' AND v.speed_rpm <> 78
-            GROUP BY v.accession_id, v.artist, v.title
-            HAVING count(*) FILTER (WHERE v.state = 'pending') > 0
-            ORDER BY v.accession_id
-            """
-        )
-    ).all()
     recent = session.scalars(
         select(Accession)
         .options(joinedload(Accession.release))
@@ -117,9 +103,85 @@ def home(request: Request, session: Session = Depends(get_session)):
         {
             "username": _username(request),
             "next_id": f"{prefix}-{next_number:04d}",
-            "uncaptured": uncaptured,
             "recent": recent,
         },
+    )
+
+
+@router.get("/tasks")
+def tasks(request: Request, type: str = "all", session: Session = Depends(get_session)):
+    """The work queue, DERIVED from state — a query, never a table to sync.
+
+    Replaces the uncaptured-backlog card: GM-0009 failed and nothing surfaced
+    it until Michael happened to open its page. Now every actionable state is
+    a task row with its reason."""
+    rows = session.execute(
+        text(
+            """
+            SELECT v.side_id, v.state, v.speed_rpm, a.accession_id, a.status AS acc_status,
+                   r.artist, r.title, c.failure_reason,
+                   c.qc->'reasons' AS qc_reasons,
+                   (c.qc->>'buy_commercial_candidate')::boolean AS buy
+            FROM v_side_status v
+            JOIN accession a ON a.accession_id = v.accession_id
+            LEFT JOIN release r ON r.discogs_release_id = a.release_id
+            LEFT JOIN capture c ON c.id = v.current_capture_id
+            ORDER BY v.side_id
+            """
+        )
+    ).all()
+    unbound = session.execute(
+        text(
+            """
+            SELECT a.accession_id, a.condition_notes, a.inventoried_at
+            FROM accession a WHERE a.status = 'inventoried'
+            ORDER BY a.accession_id
+            """
+        )
+    ).all()
+
+    tasks: list[dict] = []
+    for row in rows:
+        title = f"{row.artist} — {row.title}" if row.artist else "(unidentified)"
+        if row.state == "failed":
+            tasks.append({"type": "recapture", "id": row.side_id,
+                          "accession_id": row.accession_id, "title": title,
+                          "detail": row.failure_reason or "capture failed"})
+        elif row.state == "qc_recapture":
+            reason = (row.qc_reasons or ["QC says recapture"])[0]
+            tasks.append({"type": "recapture", "id": row.side_id,
+                          "accession_id": row.accession_id, "title": title,
+                          "detail": reason})
+        elif row.state == "qc_review":
+            reason = (row.qc_reasons or ["QC flagged this side"])[0]
+            if row.buy:
+                reason += " (commercial-copy candidate)"
+            tasks.append({"type": "review", "id": row.side_id,
+                          "accession_id": row.accession_id, "title": title,
+                          "detail": reason})
+        elif row.state == "pending" and row.acc_status in ("identified", "unidentifiable") \
+                and row.speed_rpm != 78:
+            tasks.append({"type": "capture", "id": row.side_id,
+                          "accession_id": row.accession_id, "title": title,
+                          "detail": "not yet captured"})
+        elif row.state == "qc_pending":
+            tasks.append({"type": "qc_pending", "id": row.side_id,
+                          "accession_id": row.accession_id, "title": title,
+                          "detail": "uploaded, QC verdict pending"})
+    for row in unbound:
+        tasks.append({"type": "identify", "id": row.accession_id,
+                      "accession_id": row.accession_id,
+                      "title": row.condition_notes or "(no notes)",
+                      "detail": "bind a Discogs release or mark unidentifiable"})
+
+    order = {"recapture": 0, "review": 1, "capture": 2, "identify": 3, "qc_pending": 4}
+    tasks.sort(key=lambda t: (order[t["type"]], t["id"]))
+    counts = {k: sum(1 for t in tasks if t["type"] == k) for k in order}
+    if type != "all":
+        tasks = [t for t in tasks if t["type"] == type]
+    return templates.TemplateResponse(
+        request, "partials/tasks.html",
+        {"tasks": tasks, "counts": counts, "active": type},
     )
 
 

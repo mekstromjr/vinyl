@@ -1,0 +1,25 @@
+<div style="margin-bottom:.6rem">
+  {% for key, label in [("all","All"), ("recapture","Recapture"), ("review","Review"),
+                        ("capture","Capture"), ("identify","Identify"), ("qc_pending","QC pending")] %}
+  <button type="button" class="{{ 'secondary' if active != key }}"
+          style="margin:.15rem .2rem;padding:.35rem .8rem;font-size:.9rem"
+          hx-get="/tasks?type={{ key }}" hx-target="#tasks" hx-swap="innerHTML">
+    {{ label }}{% if key != "all" and counts[key] %} ({{ counts[key] }}){% endif %}
+  </button>
+  {% endfor %}
+</div>
+{% if tasks %}
+<table>
+  <tr><th>Task</th><th>What</th><th>Why</th></tr>
+  {% for t in tasks %}
+  <tr>
+    <td><span class="badge task_{{ t.type }}">{{ t.type }}</span></td>
+    <td><a href="/accessions/{{ t.accession_id }}">{{ t.id }}</a><br>
+        <span class="muted">{{ t.title }}</span></td>
+    <td class="muted">{{ t.detail }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="muted">Nothing to do{% if active != "all" %} in this category{% endif %}. The shelf is caught up.</p>
+{% endif %}
