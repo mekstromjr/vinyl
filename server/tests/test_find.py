@@ -82,3 +82,60 @@ def test_clear_expected_runtime_flag(api):
     )
     assert resp.status_code == 200
     assert resp.json()["expected_runtime_sec"] is None
+
+
+def test_task_list_surfaces_failed_capture(api):
+    """GM-0009 failed silently; the task list must shout it."""
+    acc_id = _bound_accession(api)
+    side_id = f"{acc_id}-D1-A"
+    cap = api.post("/api/captures", json={"side_id": side_id}).json()
+    api.patch(f"/api/captures/{cap['id']}",
+              json={"status": "failed", "failure_reason": "1 ALSA xrun(s)"})
+
+    resp = api.get("/tasks")
+    assert "recapture" in resp.text
+    assert side_id in resp.text
+    assert "xrun" in resp.text
+    # the untouched side shows as a capture task
+    assert f"{acc_id}-D1-B" in resp.text
+
+    only_recapture = api.get("/tasks", params={"type": "recapture"})
+    assert side_id in only_recapture.text
+    assert f"{acc_id}-D1-B" not in only_recapture.text
+
+
+def test_task_list_identify_and_review(api):
+    unbound = api.post("/api/accessions",
+                       json={"collection": "GM", "disc_count": 1, "speed_rpm": 33}).json()
+    resp = api.get("/tasks", params={"type": "identify"})
+    assert unbound["accession_id"] in resp.text
+    assert "bind a Discogs release" in resp.text
+
+    bound = _bound_accession(api)
+    side_id = f"{bound}-D1-A"
+    cap = api.post("/api/captures", json={"side_id": side_id}).json()
+    api.patch(f"/api/captures/{cap['id']}", json={"status": "captured", "bytes": 10})
+    api.fake_s3.objects["k"] = b"x"
+    api.post(f"/api/captures/{cap['id']}/uploaded",
+             json={"s3_bucket": "vinyl-test", "s3_key": "k"})
+    import uuid as _uuid
+
+    from vinyl_server.db.models import Capture
+    from vinyl_server.db.session import get_session
+    gen = api.app.dependency_overrides[get_session]()
+    session = next(gen)
+    c = session.get(Capture, _uuid.UUID(cap["id"]))
+    c.qc_verdict = "review"
+    c.qc = {"reasons": ["57.6 clicks/min — surface damage"],
+            "buy_commercial_candidate": True}
+    session.commit()
+
+    resp = api.get("/tasks", params={"type": "review"})
+    assert side_id in resp.text
+    assert "surface damage (commercial-copy candidate)" in resp.text
+
+
+def test_home_hosts_task_list_not_backlog(api):
+    home = api.get("/")
+    assert 'hx-get="/tasks"' in home.text
+    assert "Uncaptured backlog" not in home.text
