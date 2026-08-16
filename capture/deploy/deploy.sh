@@ -17,6 +17,19 @@ WRITE_ENV="${WRITE_ENV:-1}"
 
 say() { printf '\033[1;35m[deploy]\033[0m %s\n' "$*"; }
 
+# HARD GUARD: never restart the station out from under a capture. A deploy
+# raced an arm once (2026-08-15, killed GM-0010-D1-A mid-recording): the
+# caller's idle check and the restart were ~90s apart. The check now lives
+# HERE, immediately before anything destructive, and aborts loudly.
+say "idle guard: checking the station"
+PHASE=$($SSH "$BRICK" 'curl -s -m 3 http://127.0.0.1:8081/status 2>/dev/null' | python3 -c "import json,sys
+try: print(json.load(sys.stdin).get(\"phase\",\"unknown\"))
+except Exception: print(\"unreachable\")")
+if [ "$PHASE" != "idle" ] && [ "$PHASE" != "unreachable" ]; then
+  say "ABORT: station is $PHASE — a capture or unacked review is in progress"
+  exit 1
+fi
+
 say "rsync repo -> $BRICK:/opt/vinyl-capture"
 $SSH "$BRICK" 'sudo install -d -o mekadmin /opt/vinyl-capture'
 rsync -a --delete \
