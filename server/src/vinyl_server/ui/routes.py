@@ -71,6 +71,7 @@ def _accession_context(request: Request, session: Session, accession_id: str, **
                         "imbalance": qc.get("channel_imbalance_db"),
                         "dropouts": qc.get("dropout_starts_sec") or [],
                         "mono": qc.get("mono_fold_candidate"),
+                        "human_reviewed": qc.get("human_reviewed", False),
                     } if cap.qc_verdict else None,
                 }
     return {
@@ -120,7 +121,8 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
             SELECT v.side_id, v.state, v.speed_rpm, a.accession_id, a.status AS acc_status,
                    r.artist, r.title, c.failure_reason,
                    c.upload_attempts, substring(c.upload_error for 80) AS upload_error,
-                   c.qc->'reasons' AS qc_reasons
+                   c.qc->'reasons' AS qc_reasons,
+                   (c.qc->>'human_reviewed')::boolean AS human_reviewed
             FROM v_side_status v
             JOIN accession a ON a.accession_id = v.accession_id
             LEFT JOIN release r ON r.discogs_release_id = a.release_id
@@ -152,6 +154,8 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
                           "accession_id": row.accession_id, "title": title,
                           "detail": reason})
         elif row.state == "qc_review":
+            if row.human_reviewed:
+                continue  # a human listened and signed off
             reason = (row.qc_reasons or ["QC flagged this side"])[0]
             tasks.append({"type": "review", "id": row.side_id,
                           "accession_id": row.accession_id, "title": title,
@@ -419,6 +423,37 @@ def capture_audio(
     obj = s3.get_object(Bucket=cap.s3_bucket, Key=cap.s3_key)
     return StreamingResponse(
         obj["Body"], media_type="audio/flac", headers=common
+    )
+
+
+@router.post("/accessions/{accession_id}/captures/{capture_id}/reviewed")
+def mark_reviewed(
+    accession_id: str,
+    capture_id: uuid.UUID,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """Human ack of a review verdict: 'I listened, it is fine for the archive.'
+    Clears the task and gates the side into the publish pipeline (#8:
+    publishable = qc pass OR human-reviewed)."""
+    from datetime import UTC, datetime
+
+    from vinyl_server.db.models import Capture
+
+    cap = session.get(Capture, capture_id)
+    if cap is None or cap.side_id.rsplit("-", 2)[0] != accession_id.upper():
+        raise HTTPException(404, "no such capture")
+    if cap.qc_verdict != "review":
+        raise HTTPException(409, f"capture is {cap.qc_verdict}, not review")
+    qc = dict(cap.qc or {})
+    qc["human_reviewed"] = True
+    qc["human_reviewed_at"] = datetime.now(UTC).isoformat()
+    qc["human_reviewed_by"] = _username(request) or "unknown"
+    cap.qc = qc
+    session.flush()
+    return templates.TemplateResponse(
+        request, "partials/sides_table.html",
+        _accession_context(request, session, accession_id),
     )
 
 
