@@ -71,7 +71,6 @@ def _accession_context(request: Request, session: Session, accession_id: str, **
                         "imbalance": qc.get("channel_imbalance_db"),
                         "dropouts": qc.get("dropout_starts_sec") or [],
                         "mono": qc.get("mono_fold_candidate"),
-                        "buy": qc.get("buy_commercial_candidate"),
                     } if cap.qc_verdict else None,
                 }
     return {
@@ -121,8 +120,7 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
             SELECT v.side_id, v.state, v.speed_rpm, a.accession_id, a.status AS acc_status,
                    r.artist, r.title, c.failure_reason,
                    c.upload_attempts, substring(c.upload_error for 80) AS upload_error,
-                   c.qc->'reasons' AS qc_reasons,
-                   (c.qc->>'buy_commercial_candidate')::boolean AS buy
+                   c.qc->'reasons' AS qc_reasons
             FROM v_side_status v
             JOIN accession a ON a.accession_id = v.accession_id
             LEFT JOIN release r ON r.discogs_release_id = a.release_id
@@ -155,8 +153,6 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
                           "detail": reason})
         elif row.state == "qc_review":
             reason = (row.qc_reasons or ["QC flagged this side"])[0]
-            if row.buy:
-                reason += " (commercial-copy candidate)"
             tasks.append({"type": "review", "id": row.side_id,
                           "accession_id": row.accession_id, "title": title,
                           "detail": reason})

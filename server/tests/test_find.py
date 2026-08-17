@@ -126,13 +126,12 @@ def test_task_list_identify_and_review(api):
     session = next(gen)
     c = session.get(Capture, _uuid.UUID(cap["id"]))
     c.qc_verdict = "review"
-    c.qc = {"reasons": ["57.6 clicks/min — surface damage"],
-            "buy_commercial_candidate": True}
+    c.qc = {"reasons": ["203.6 clicks/min — heavy surface damage"]}
     session.commit()
 
     resp = api.get("/tasks", params={"type": "review"})
     assert side_id in resp.text
-    assert "surface damage (commercial-copy candidate)" in resp.text
+    assert "heavy surface damage" in resp.text
 
 
 def test_home_hosts_task_list_not_backlog(api):

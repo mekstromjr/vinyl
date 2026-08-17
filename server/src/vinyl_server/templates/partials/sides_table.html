@@ -23,8 +23,7 @@
       {% set qc = listen[s.side_id].qc %}
       {% if qc %}
       <div class="muted" style="margin-top:.5rem;font-size:.9rem">
-        <strong>QC: <span class="badge qc_{{ qc.verdict }}">{{ qc.verdict }}</span></strong>
-        {% if qc.buy %} · flagged: consider a commercial copy{% endif %}<br>
+        <strong>QC: <span class="badge qc_{{ qc.verdict }}">{{ qc.verdict }}</span></strong><br>
         {% if qc.reasons %}{% for reason in qc.reasons %}{{ reason }}<br>{% endfor %}{% endif %}
         {% if qc.noise is not none %}lead-in floor {{ qc.noise }} dBFS · {% endif %}
         {% if qc.cpm is not none %}{{ qc.cpm }} clicks/min · {% endif %}
