@@ -135,10 +135,17 @@ class Station:
         summary = session.stats.summary()
         loop = session.loop_detector
         env_tail = summary.get("envelope_1s", [])[-5:]
+        tail_hot = len(env_tail) == 5 and sum(env_tail) / 5 > 0.05
+        # The truncation tripwire only means something when an expected
+        # runtime EXISTED and the timer was trusting it. Hitting the hard cap
+        # on a no-expected side is the designed outcome (Michael: 'if the
+        # time runs out it should say complete') — GM-0017-D1-B was failed
+        # and DISCARDED because loud runout noise hovered at the music
+        # threshold. Never again: no expected, no tripwire.
         music_at_end = (
             reason == "timer"
-            and len(env_tail) == 5
-            and sum(env_tail) / 5 > 0.05
+            and (side or {}).get("expected_runtime_sec") is not None
+            and tail_hot
         )
         verdict = judge(
             summary,
@@ -157,6 +164,7 @@ class Station:
             status=status,
             failure_reason="; ".join(verdict.reasons) or None,
             integrity=dict(verdict.report, stop_reason=reason,
+                           tail_hot_at_cap=tail_hot if reason == "timer" else None,
                            loop_diag=loop.diagnostics() if loop else None,
                            stderr_tail=session.stderr_tail() or None),
             sha256=sha,

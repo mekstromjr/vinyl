@@ -38,7 +38,12 @@ class LockedGrooveDetector:
         threshold: float = 0.97,
         min_level: float = 2e-3,
         trigger_revolutions: int = 10,
-        vote_fraction: float = 0.8,
+        # 0.5 (2026-08-17): live diagnostics on GM-0017-D1-B showed runout
+        # correlating at 0.9988 with 7562 qualifying buckets — but only
+        # ~40-50% DENSITY (the live max-channel envelope flickers more than
+        # the mono decode the 0.8 vote was tuned against). Music density
+        # above threshold is near zero, so 0.5 keeps a wide safety margin.
+        vote_fraction: float = 0.5,
         music_level: float = 0.05,
     ) -> None:
         self.lag = max(2, round(period_sec / bucket_sec))

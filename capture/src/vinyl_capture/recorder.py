@@ -42,8 +42,6 @@ class RecordingSession:
         rotation_period_sec: float | None = None,
         on_loop=None,
         on_xrun=None,
-        loop_threshold: float = 0.96,
-        loop_revolutions: int = 10,
     ) -> None:
         self.out_path = out_path
         self.stats = StreamStats(sample_rate=sample_rate)
@@ -52,11 +50,9 @@ class RecordingSession:
         self.on_loop = on_loop
         self.on_xrun = on_xrun
         self.loop_detector = (
-            LockedGrooveDetector(
-                rotation_period_sec,
-                threshold=loop_threshold,
-                trigger_revolutions=loop_revolutions,
-            )
+            # class defaults are the single source of tuning truth — the old
+            # per-call overrides silently pinned a stale threshold
+            LockedGrooveDetector(rotation_period_sec)
             if rotation_period_sec
             else None
         )

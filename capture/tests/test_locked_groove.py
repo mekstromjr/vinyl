@@ -116,3 +116,35 @@ def test_judge_runout_stop_passes():
         loop_started_at_sec=1205.0,
     )
     assert v.passed
+
+
+def test_cap_expiry_without_expected_is_not_truncation():
+    """GM-0017-D1-B: no expected runtime, hard cap reached, loud runout at
+    the tail — the tripwire fired and DISCARDED a good capture. Rule: no
+    expected runtime, no tripwire; cap expiry = complete."""
+    v = judge(
+        {"duration_sec": 2098.0, "clipped_samples": 0, "dc_offset_l": 0.0,
+         "dc_offset_r": 0.0, "peak_dbfs_l": -8, "peak_dbfs_r": -8,
+         "envelope_1s": []},
+        xruns=0,
+        expected_runtime_sec=None,
+        music_at_end=False,  # station gates this on expected being present
+    )
+    assert v.passed
+
+
+def test_live_density_runout_triggers_at_half_vote():
+    """Live diagnostics: runout hits at ~40-50% density, corr 0.9988. The
+    0.8 vote never fired in the field; 0.5 must."""
+    import random
+    rng = random.Random(7)
+    det = _det()
+    revolution = [0.05 + 0.02 * math.sin(i / 3) for i in range(18)]
+    # simulate flickering hits: half the revolutions replaced with noise
+    stream = list(MUSIC_PREFIX)
+    for _ in range(40):
+        if rng.random() < 0.6:
+            stream += revolution
+        else:
+            stream += [0.05 + 0.03 * rng.random() for _ in range(18)]
+    assert _feed_seq(det, stream) is not None
