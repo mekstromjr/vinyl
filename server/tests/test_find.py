@@ -164,6 +164,7 @@ def _reviewed_capture(api):
     api.post(f"/api/captures/{cap['id']}/uploaded",
              json={"s3_bucket": "vinyl-test", "s3_key": "k2"})
     import uuid as _uuid
+
     from vinyl_server.db.models import Capture
     from vinyl_server.db.session import get_session
     gen = api.app.dependency_overrides[get_session]()
@@ -191,6 +192,7 @@ def test_mark_reviewed_clears_the_task(api):
 def test_mark_reviewed_only_for_review_verdicts(api):
     acc_id, side_id, cap_id = _reviewed_capture(api)
     import uuid as _uuid
+
     from vinyl_server.db.models import Capture
     from vinyl_server.db.session import get_session
     gen = api.app.dependency_overrides[get_session]()
