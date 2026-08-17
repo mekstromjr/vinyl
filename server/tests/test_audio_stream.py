@@ -113,12 +113,11 @@ def test_qc_panel_renders_verdict_and_reasons(api):
     session = next(gen)
     cap = session.get(Capture, uuid.UUID(cap_id))
     cap.qc_verdict = "review"
-    cap.qc = {"reasons": ["41.0 clicks/min — surface damage"],
+    cap.qc = {"reasons": ["203.0 clicks/min — heavy surface damage"],
               "channel_imbalance_db": 1.0, "dropout_starts_sec": [61.5],
-              "mono_fold_candidate": False, "buy_commercial_candidate": True}
-    cap.clicks_per_min = 41.0
+              "mono_fold_candidate": False}
+    cap.clicks_per_min = 203.0
     session.commit()
     page = api.get(f"/accessions/{acc_id}")
     assert "surface damage" in page.text
-    assert "consider a commercial copy" in page.text
     assert "1:01" in page.text  # clickable dropout timestamp

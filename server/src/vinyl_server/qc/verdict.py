@@ -12,9 +12,14 @@ from dataclasses import dataclass
 
 from vinyl_shared.loopdetect import ROTATION_PERIOD_SEC, LockedGrooveDetector
 
+# v2 (2026-08-17): field-calibrated by Michael's ears. Records at 90-120
+# clicks/min and -28 dBFS lead-ins were "just fine for an archive record" —
+# v1 flagged ordinary vintage surface noise. The buy-a-commercial-copy flag
+# is gone entirely: pops are a restoration-software problem, not a
+# procurement problem.
 THRESHOLDS = {
-    "noise_floor_review_dbfs": -35.0,
-    "clicks_review_per_min": 40.0,
+    "noise_floor_review_dbfs": -25.0,
+    "clicks_review_per_min": 150.0,
     "imbalance_review_db": 6.0,
     "duration_short_recapture_sec": 90.0,
     "mono_fold_candidate_corr": 0.9,
@@ -25,7 +30,6 @@ THRESHOLDS = {
 class QCResult:
     verdict: str            # pass | review | recapture
     reasons: list[str]
-    buy_commercial: bool
     report: dict
 
 
@@ -63,7 +67,6 @@ def judge(
     t = THRESHOLDS
     reasons: list[str] = []
     verdict = "pass"
-    buy = False
 
     if loop.get("mid_record_loop"):
         m, s = divmod(int(loop["loop_at_sec"]), 60)
@@ -86,11 +89,9 @@ def judge(
         if noise_floor_dbfs is not None and noise_floor_dbfs > t["noise_floor_review_dbfs"]:
             reasons.append(f"lead-in noise floor {noise_floor_dbfs} dBFS — worn/dirty disc")
             verdict = "review"
-            buy = True
         if clicks["clicks_per_min"] > t["clicks_review_per_min"]:
-            reasons.append(f"{clicks['clicks_per_min']} clicks/min — surface damage")
+            reasons.append(f"{clicks['clicks_per_min']} clicks/min — heavy surface damage")
             verdict = "review"
-            buy = True
         if dropout_starts:
             reasons.append(f"{len(dropout_starts)} dropout(s) in the music region")
             verdict = "review"
@@ -113,7 +114,6 @@ def judge(
         "music_end_sec": float(music_end_sec),
         "expected_runtime_sec": expected_runtime_sec,
         "mono_fold_candidate": mono_candidate,
-        "buy_commercial_candidate": buy,
         "thresholds": t,
     }
-    return QCResult(verdict=verdict, reasons=reasons, buy_commercial=buy, report=report)
+    return QCResult(verdict=verdict, reasons=reasons, report=report)

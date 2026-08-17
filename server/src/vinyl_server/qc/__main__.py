@@ -99,14 +99,13 @@ def _notify(side_id: str, result) -> None:
     )
     if not (url and token and service):
         return
-    flag = " Candidate for buying a commercial copy." if result.buy_commercial else ""
     with contextlib.suppress(httpx.HTTPError):
         httpx.post(
             f"{url}/api/services/notify/{service}",
             headers={"Authorization": f"Bearer {token}"},
             json={
                 "title": f"{side_id} QC: {result.verdict}",
-                "message": "; ".join(result.reasons) + flag,
+                "message": "; ".join(result.reasons),
             },
             timeout=10,
         )

@@ -33,7 +33,7 @@ def _judge(**over):
 
 def test_clean_side_passes():
     r = _judge()
-    assert r.verdict == "pass" and not r.reasons and not r.buy_commercial
+    assert r.verdict == "pass" and not r.reasons
 
 
 def test_mid_record_loop_is_recapture():
@@ -47,19 +47,22 @@ def test_short_music_is_recapture():
     assert r.verdict == "recapture"
 
 
-def test_noisy_disc_reviews_and_flags_commercial():
-    r = _judge(noise_floor_dbfs=-30.0)
-    assert r.verdict == "review" and r.buy_commercial
+def test_vintage_surface_noise_passes_v2():
+    """Michael's ears calibrated v2: 90-120 cpm and -28 dBFS lead-ins are
+    fine archive records, not review cases."""
+    r = _judge(noise_floor_dbfs=-28.0, clicks={"clicks": 2000, "clicks_per_min": 119.0})
+    assert r.verdict == "pass"
 
 
-def test_clicky_disc_reviews_and_flags_commercial():
-    r = _judge(clicks={"clicks": 900, "clicks_per_min": 45.0})
-    assert r.verdict == "review" and r.buy_commercial
+def test_truly_trashed_disc_still_reviews():
+    r = _judge(noise_floor_dbfs=-18.0, clicks={"clicks": 5000, "clicks_per_min": 200.0})
+    assert r.verdict == "review"
+    assert "heavy surface damage" in "; ".join(r.reasons)
 
 
-def test_dropouts_review_without_commercial_flag():
+def test_dropouts_still_review():
     r = _judge(dropout_starts=[301.2])
-    assert r.verdict == "review" and not r.buy_commercial
+    assert r.verdict == "review"
 
 
 def test_mono_candidate_noted_not_verdicted():
@@ -82,12 +85,13 @@ def test_report_json_serializable_with_numpy_inputs():
     )
     json.dumps(r.report, default=lambda o: o.item() if hasattr(o, "item") else str(o))
     assert isinstance(r.report["mono_fold_candidate"], bool)
+    assert "buy_commercial_candidate" not in r.report
     assert isinstance(r.report["music_end_sec"], float)
 
 
 def test_reasons_persisted_in_report():
     """The phone notification is ephemeral; the WHY must live in the blob."""
-    r = _judge(noise_floor_dbfs=-30.0)
+    r = _judge(noise_floor_dbfs=-20.0)  # above the v2 -25 threshold
     assert r.report["reasons"] and "noise floor" in r.report["reasons"][0]
 
 
