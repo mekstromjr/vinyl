@@ -153,3 +153,52 @@ def test_task_list_shows_uploading(api):
     assert side_id in resp.text
     assert "waiting to upload" in resp.text
     assert "sendall wedged" in resp.text
+
+
+def _reviewed_capture(api):
+    acc_id = _bound_accession(api)
+    side_id = f"{acc_id}-D1-A"
+    cap = api.post("/api/captures", json={"side_id": side_id}).json()
+    api.patch(f"/api/captures/{cap['id']}", json={"status": "captured", "bytes": 10})
+    api.fake_s3.objects["k2"] = b"x"
+    api.post(f"/api/captures/{cap['id']}/uploaded",
+             json={"s3_bucket": "vinyl-test", "s3_key": "k2"})
+    import uuid as _uuid
+
+    from vinyl_server.db.models import Capture
+    from vinyl_server.db.session import get_session
+    gen = api.app.dependency_overrides[get_session]()
+    session = next(gen)
+    c = session.get(Capture, _uuid.UUID(cap["id"]))
+    c.qc_verdict = "review"
+    c.qc = {"reasons": ["9.5 dB imbalance"]}
+    session.commit()
+    return acc_id, side_id, cap["id"]
+
+
+def test_mark_reviewed_clears_the_task(api):
+    acc_id, side_id, cap_id = _reviewed_capture(api)
+    assert side_id in api.get("/tasks", params={"type": "review"}).text
+
+    resp = api.post(f"/accessions/{acc_id}/captures/{cap_id}/reviewed",
+                    headers={"X-authentik-username": "michael"})
+    assert resp.status_code == 200
+    assert "reviewed by human" in resp.text
+    assert "Mark reviewed" not in resp.text
+
+    assert side_id not in api.get("/tasks", params={"type": "review"}).text
+
+
+def test_mark_reviewed_only_for_review_verdicts(api):
+    acc_id, side_id, cap_id = _reviewed_capture(api)
+    import uuid as _uuid
+
+    from vinyl_server.db.models import Capture
+    from vinyl_server.db.session import get_session
+    gen = api.app.dependency_overrides[get_session]()
+    session = next(gen)
+    c = session.get(Capture, _uuid.UUID(cap_id))
+    c.qc_verdict = "pass"
+    session.commit()
+    resp = api.post(f"/accessions/{acc_id}/captures/{cap_id}/reviewed")
+    assert resp.status_code == 409

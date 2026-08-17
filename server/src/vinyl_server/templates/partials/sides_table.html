@@ -23,7 +23,16 @@
       {% set qc = listen[s.side_id].qc %}
       {% if qc %}
       <div class="muted" style="margin-top:.5rem;font-size:.9rem">
-        <strong>QC: <span class="badge qc_{{ qc.verdict }}">{{ qc.verdict }}</span></strong><br>
+        <strong>QC: <span class="badge qc_{{ qc.verdict }}">{{ qc.verdict }}</span></strong>
+        {% if qc.verdict == "review" and not qc.human_reviewed %}
+        <button type="button" class="secondary" style="margin:0 0 0 .6rem;padding:.25rem .7rem;font-size:.85rem"
+                hx-post="/accessions/{{ s.side_id.rsplit('-', 2)[0] }}/captures/{{ listen[s.side_id].capture_id }}/reviewed"
+                hx-target="#sides" hx-swap="innerHTML"
+                hx-confirm="Mark {{ s.side_id }} as reviewed — you listened and it is archive-worthy as-is?">
+          Mark reviewed</button>
+        {% elif qc.human_reviewed %}
+        <span class="badge qc_pass" style="margin-left:.6rem">reviewed by human</span>
+        {% endif %}<br>
         {% if qc.reasons %}{% for reason in qc.reasons %}{{ reason }}<br>{% endfor %}{% endif %}
         {% if qc.noise is not none %}lead-in floor {{ qc.noise }} dBFS · {% endif %}
         {% if qc.cpm is not none %}{{ qc.cpm }} clicks/min · {% endif %}
