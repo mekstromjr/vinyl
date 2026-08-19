@@ -1,0 +1,68 @@
+{# Five-stop condition slider + info foldout. Pass `grade` (string or None).
+   Submits `condition_grade` — empty string when untouched-and-ungraded, so a
+   pre-slider accession is never silently stamped "good" by a notes save. #}
+<div class="grade-picker" data-grade="{{ grade or '' }}">
+  <label style="margin-top:.9rem">Condition
+    <button type="button" class="grade-info-btn" aria-label="What do the grades mean?"
+            onclick="this.closest('.grade-picker').querySelector('details').toggleAttribute('open')">i</button>
+  </label>
+  <div class="grade-readout">
+    <strong data-role="grade-name">not graded</strong>
+    <span class="muted" data-role="grade-desc">drag to set</span>
+  </div>
+  <input type="range" min="1" max="5" step="1" value="3" data-role="grade-slider"
+         aria-label="Condition grade">
+  <div class="grade-ticks muted">
+    <span>mint</span><span>excellent</span><span>good</span><span>fair</span><span>poor</span>
+  </div>
+  <input type="hidden" name="condition_grade" value="{{ grade or '' }}">
+
+  <details class="grade-info">
+    <summary>What do the grades mean?</summary>
+    <div class="grade-row">
+      <svg viewBox="0 0 64 64"><rect x="6" y="6" width="52" height="52" rx="2"/>
+        <circle cx="32" cy="32" r="15" class="art"/>
+        <path d="M13 20 L27 6" class="shine"/></svg>
+      <div><strong>Mint</strong> — looks unplayed. Crisp corners, glossy jacket,
+        no shelf or ring wear at all. Rare in a played collection.</div>
+    </div>
+    <div class="grade-row">
+      <svg viewBox="0 0 64 64"><rect x="6" y="6" width="52" height="52" rx="2"/>
+        <circle cx="32" cy="32" r="15" class="art"/>
+        <path d="M58 6 L52 6 L58 12 Z" class="wear"/>
+        <path d="M10 57 H40" class="scuff"/></svg>
+      <div><strong>Excellent</strong> — very light wear: a soft corner, a faint
+        shelf line. You have to look for the flaws to see them.</div>
+    </div>
+    <div class="grade-row">
+      <svg viewBox="0 0 64 64"><rect x="6" y="6" width="52" height="52" rx="2"/>
+        <circle cx="32" cy="32" r="15" class="art"/>
+        <circle cx="32" cy="32" r="24" class="ring"/>
+        <path d="M58 6 L51 6 L58 13 Z" class="wear"/>
+        <path d="M6 58 L13 58 L6 51 Z" class="wear"/></svg>
+      <div><strong>Good</strong> — regular wear for its age: visible ring wear,
+        rounded corners, general handling. The default for this collection.</div>
+    </div>
+    <div class="grade-row">
+      <svg viewBox="0 0 64 64"><rect x="6" y="6" width="52" height="52" rx="2"/>
+        <circle cx="32" cy="32" r="24" class="ring"/>
+        <path d="M12 14 q6 -6 10 0 t10 0 t8 -2" class="pen"/>
+        <path d="M6 58 l7 -3 l6 3 l7 -4 l6 4" class="split"/></svg>
+      <div><strong>Fair</strong> — not great: writing or drawing on the jacket
+        or label, a seam split, water spotting, noticeable damage.</div>
+    </div>
+    <div class="grade-row">
+      <svg viewBox="0 0 64 64"><rect x="6" y="6" width="52" height="52" rx="2"/>
+        <circle cx="32" cy="32" r="24" class="ring"/>
+        <path d="M6 50 l8 -4 l5 5 l9 -6 l6 6 l8 -5" class="split"/>
+        <rect x="2" y="24" width="14" height="7" rx="1" class="tape" transform="rotate(-8 9 27)"/>
+        <rect x="47" y="8" width="14" height="7" rx="1" class="tape" transform="rotate(50 54 11)"/>
+        <path d="M14 38 q8 4 14 -1 t14 2" class="pen"/></svg>
+      <div><strong>Poor</strong> — everything else: barely holding together,
+        repaired with tape, missing chunks, mold. Grade it and move on.</div>
+    </div>
+    <p class="muted" style="margin:.5rem 0 0">Grade the set overall — when the
+      jacket and discs disagree badly, pick the worse one and say why in the
+      notes. When stuck between two grades, take the lower.</p>
+  </details>
+</div>

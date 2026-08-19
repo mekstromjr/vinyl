@@ -83,9 +83,10 @@
 <div class="card">
   <h2>Housekeeping</h2>
   <form method="post" action="/accessions/{{ acc.accession_id }}/condition">
-    <label for="condition_notes">Condition notes</label>
+    {% with grade=acc.condition_grade %}{% include "partials/condition_picker.html" %}{% endwith %}
+    <label for="condition_notes">Anything unusual? (optional)</label>
     <textarea name="condition_notes" id="condition_notes" rows="2">{{ acc.condition_notes or "" }}</textarea>
-    <button type="submit" class="secondary">Save notes</button>
+    <button type="submit" class="secondary">Save condition</button>
   </form>
   <form method="post" action="/accessions/{{ acc.accession_id }}/status" style="display:inline">
     <input type="hidden" name="status" value="unidentifiable">

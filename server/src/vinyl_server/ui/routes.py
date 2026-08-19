@@ -16,7 +16,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session, joinedload
-from vinyl_shared.states import AccessionStatus, AssetKind, Speed
+from vinyl_shared.states import AccessionStatus, AssetKind, ConditionGrade, Speed
 
 from vinyl_server import services
 from vinyl_server.db.models import Accession, Asset
@@ -134,7 +134,7 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
     unbound = session.execute(
         text(
             """
-            SELECT a.accession_id, a.condition_notes, a.inventoried_at
+            SELECT a.accession_id, a.condition_grade, a.condition_notes, a.inventoried_at
             FROM accession a WHERE a.status = 'inventoried'
             ORDER BY a.accession_id
             """
@@ -179,7 +179,9 @@ def tasks(request: Request, type: str = "all", session: Session = Depends(get_se
     for row in unbound:
         tasks.append({"type": "identify", "id": row.accession_id,
                       "accession_id": row.accession_id,
-                      "title": row.condition_notes or "(no notes)",
+                      "title": ", ".join(
+                          p for p in (row.condition_grade, row.condition_notes) if p
+                      ) or "(no notes)",
                       "detail": "bind a Discogs release or mark unidentifiable"})
 
     order = {"recapture": 0, "review": 1, "capture": 2, "identify": 3,
@@ -213,6 +215,7 @@ def find(request: Request, q: str = "", session: Session = Depends(get_session))
                    OR r.label ILIKE :like
                    OR r.catalog_number ILIKE :like
                    OR a.condition_notes ILIKE :like
+                   OR a.condition_grade = lower(:exact)
                    OR r.year::text = :exact
                 ORDER BY a.accession_id
                 LIMIT 25
@@ -239,6 +242,7 @@ def create(
     speed_rpm: int = Form(33),
     has_jacket: str = Form("true"),
     has_inner_sleeve: str = Form("true"),
+    condition_grade: str = Form(""),
     condition_notes: str = Form(""),
     session: Session = Depends(get_session),
 ):
@@ -249,6 +253,7 @@ def create(
         speed_rpm=Speed(speed_rpm),
         has_jacket=has_jacket == "true",
         has_inner_sleeve=has_inner_sleeve == "true",
+        condition_grade=ConditionGrade(condition_grade) if condition_grade else None,
         condition_notes=condition_notes.strip() or None,
     )
     return RedirectResponse(f"/accessions/{acc.accession_id}?new=1", status_code=303)
@@ -474,6 +479,7 @@ def card_pdf(accession_id: str, session: Session = Depends(get_session)):
         year=acc.release.year if acc.release else None,
         disc_count=acc.disc_count,
         speeds={s.speed_rpm for s in acc.sides},
+        condition_grade=acc.condition_grade,
         condition_notes=acc.condition_notes,
         side_ids=[s.side_id for s in sorted(acc.sides, key=lambda s: (s.disc, s.side))],
     )
@@ -489,10 +495,15 @@ def card_pdf(accession_id: str, session: Session = Depends(get_session)):
 @router.post("/accessions/{accession_id}/condition")
 def save_condition(
     accession_id: str,
+    condition_grade: str = Form(""),
     condition_notes: str = Form(""),
     session: Session = Depends(get_session),
 ):
     acc = services.get_accession(session, accession_id)
+    # Empty grade means the slider was never touched — leave NULL alone rather
+    # than un-grading on every notes edit.
+    if condition_grade:
+        acc.condition_grade = ConditionGrade(condition_grade)
     acc.condition_notes = condition_notes.strip() or None
     session.flush()
     return RedirectResponse(f"/accessions/{acc.accession_id}", status_code=303)

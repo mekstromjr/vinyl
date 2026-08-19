@@ -49,6 +49,22 @@ class Speed(IntEnum):
     RPM_78 = 78
 
 
+class ConditionGrade(StrEnum):
+    """Physical condition of a set, graded once at inventory time.
+
+    Five stops on a slider, not Goldmine (M/NM/VG+/...): the archive keeps the
+    FLAC master either way, so the grade is context for future-Michael, not a
+    sale listing. One overall grade per set — media and jacket are not graded
+    separately. Free-text ``condition_notes`` remains for the genuinely weird.
+    """
+
+    MINT = "mint"            # perfect — looks unplayed
+    EXCELLENT = "excellent"  # very light wear
+    GOOD = "good"            # regular wear for its age
+    FAIR = "fair"            # writing/drawing, seam split, noticeable damage
+    POOR = "poor"            # barely holding together, or repaired with tape
+
+
 class AccessionStatus(StrEnum):
     """Identification state of a set. Distinct from capture progress."""
 

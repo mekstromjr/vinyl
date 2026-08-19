@@ -156,3 +156,18 @@ def test_delete_accession(api):
     acc = _create(api)
     assert api.delete(f"/api/accessions/{acc['accession_id']}").status_code == 204
     assert api.get(f"/api/accessions/{acc['accession_id']}").status_code == 404
+
+
+def test_condition_grade_create_patch_and_reject(api):
+    acc = _create(api, condition_grade="fair")
+    assert acc["condition_grade"] == "fair"
+
+    patched = api.patch(
+        f"/api/accessions/{acc['accession_id']}", json={"condition_grade": "poor"}
+    ).json()
+    assert patched["condition_grade"] == "poor"
+
+    # ungraded stays NULL, and made-up grades are rejected at the schema
+    assert _create(api)["condition_grade"] is None
+    resp = api.post("/api/accessions", json={"disc_count": 1, "condition_grade": "vg+"})
+    assert resp.status_code == 422

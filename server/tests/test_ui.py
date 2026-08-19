@@ -118,3 +118,29 @@ def test_unidentifiable_and_delete(api):
     resp = api.post(f"/accessions/{acc_id}/delete", follow_redirects=False)
     assert resp.status_code == 303
     assert api.get(f"/accessions/{acc_id}").status_code == 404
+
+
+def test_condition_grade_from_inventory_form(api):
+    acc_id = _create_via_ui(api, condition_grade="fair")
+    page = api.get(f"/accessions/{acc_id}")
+    assert 'data-grade="fair"' in page.text
+
+
+def test_notes_save_never_ungrades(api):
+    """The hidden field submits "" when the slider was never touched; a notes
+    edit on an ungraded set must leave the grade NULL, and a grade must
+    survive a later notes-only save."""
+    acc_id = _create_via_ui(api, condition_grade="")
+    api.post(f"/accessions/{acc_id}/condition",
+             data={"condition_grade": "", "condition_notes": "smells like a basement"})
+    assert 'data-grade=""' in api.get(f"/accessions/{acc_id}").text
+
+    api.post(f"/accessions/{acc_id}/condition",
+             data={"condition_grade": "excellent", "condition_notes": ""})
+    assert 'data-grade="excellent"' in api.get(f"/accessions/{acc_id}").text
+
+
+def test_grade_info_foldout_present(api):
+    resp = api.get("/inventory/new")
+    assert "What do the grades mean?" in resp.text
+    assert "repaired with tape" in resp.text
