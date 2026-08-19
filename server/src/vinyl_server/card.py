@@ -60,6 +60,7 @@ def render_card(
     year: int | None,
     disc_count: int,
     speeds: set[Speed],
+    condition_grade: str | None = None,
     condition_notes: str | None,
     side_ids: list[str],
 ) -> bytes:
@@ -119,10 +120,13 @@ def render_card(
     c.drawString(x0, y, f"{disc_count} disc{plural} · {_speed_label(speeds)}")
     y -= 0.20 * inch
 
-    if condition_notes:
+    if condition_grade or condition_notes:
+        cond = " — ".join(
+            p for p in (condition_grade and condition_grade.capitalize(), condition_notes) if p
+        )
         c.setFillColor(_MUTED)
         c.setFont("Helvetica", 8.5)
-        c.drawString(x0, y, _truncate(c, condition_notes, "Helvetica", 8.5, text_w))
+        c.drawString(x0, y, _truncate(c, cond, "Helvetica", 8.5, text_w))
         y -= 0.18 * inch
 
     # --- 78 banner ------------------------------------------------------------

@@ -82,3 +82,10 @@ def test_card_route(api):
     assert card.headers["content-type"] == "application/pdf"
     assert card.content.startswith(b"%PDF")
     assert acc_id.encode() in card.content
+
+
+def test_condition_grade_printed_with_notes():
+    pdf = _render(condition_grade="poor", condition_notes="taped seams")
+    assert b"Poor" in pdf and b"taped seams" in pdf
+    # grade alone still prints; neither alone crashes the layout
+    assert b"Good" in _render(condition_grade="good", condition_notes=None)

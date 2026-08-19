@@ -6,7 +6,14 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-from vinyl_shared.states import AccessionStatus, AssetKind, CaptureStatus, QCVerdict, Speed
+from vinyl_shared.states import (
+    AccessionStatus,
+    AssetKind,
+    CaptureStatus,
+    ConditionGrade,
+    QCVerdict,
+    Speed,
+)
 
 
 class AccessionCreate(BaseModel):
@@ -15,6 +22,7 @@ class AccessionCreate(BaseModel):
     speed_rpm: Speed = Speed.RPM_33
     has_jacket: bool = True
     has_inner_sleeve: bool = True
+    condition_grade: ConditionGrade | None = None
     condition_notes: str | None = None
 
 
@@ -22,6 +30,7 @@ class AccessionPatch(BaseModel):
     disc_count: int | None = Field(default=None, ge=1, le=20)
     has_jacket: bool | None = None
     has_inner_sleeve: bool | None = None
+    condition_grade: ConditionGrade | None = None
     condition_notes: str | None = None
     status: AccessionStatus | None = None
 
@@ -75,6 +84,7 @@ class AccessionOut(BaseModel):
     disc_count: int
     has_jacket: bool
     has_inner_sleeve: bool
+    condition_grade: ConditionGrade | None
     condition_notes: str | None
     status: AccessionStatus
     release: ReleaseOut | None

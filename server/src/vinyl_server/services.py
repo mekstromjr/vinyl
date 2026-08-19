@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
 from vinyl_shared.ids import format_accession_id, format_side_id
-from vinyl_shared.states import AccessionStatus, AssetKind, Speed
+from vinyl_shared.states import AccessionStatus, AssetKind, ConditionGrade, Speed
 
 from vinyl_server.db.models import Accession, Asset, DiscSide, Release
 from vinyl_server.musicbrainz import lookup_release_mbid
@@ -52,6 +52,7 @@ def create_accession(
     speed_rpm: Speed,
     has_jacket: bool,
     has_inner_sleeve: bool,
+    condition_grade: ConditionGrade | None = None,
     condition_notes: str | None,
 ) -> Accession:
     # Row-locking allocation: two concurrent sessions can never mint one number.
@@ -73,6 +74,7 @@ def create_accession(
         disc_count=disc_count,
         has_jacket=has_jacket,
         has_inner_sleeve=has_inner_sleeve,
+        condition_grade=condition_grade,
         condition_notes=condition_notes,
         status=AccessionStatus.INVENTORIED,
     )

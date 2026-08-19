@@ -78,7 +78,78 @@
     .flag78 { background: var(--bad); color: #fff; border-radius: 8px;
               padding: .6rem .9rem; font-weight: 700; margin-top: .8rem; }
     .htmx-request { opacity: .5; }
+    /* Condition grade picker */
+    .grade-picker input[type=range] {
+      -webkit-appearance: none; appearance: none; height: 10px; padding: 0;
+      background: linear-gradient(90deg, var(--ok), var(--warn), var(--bad));
+      border-radius: 999px; border: 0; margin-top: .9rem;
+    }
+    .grade-picker input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 34px; height: 34px; border-radius: 50%;
+      background: #fff; border: 3px solid var(--accent); cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    }
+    .grade-picker input[type=range]::-moz-range-thumb {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: #fff; border: 3px solid var(--accent); cursor: pointer;
+    }
+    .grade-picker.ungraded input[type=range] { opacity: .35; }
+    .grade-ticks { display: flex; justify-content: space-between;
+                   font-size: .75rem; margin-top: .2rem; }
+    .grade-readout { margin-top: .5rem; font-size: 1.05rem; }
+    .grade-readout strong { text-transform: capitalize; }
+    .grade-info-btn {
+      margin: 0 0 0 .45rem; padding: 0; width: 1.3rem; height: 1.3rem;
+      border-radius: 50%; font: italic 700 .85rem/1.3rem Georgia, serif;
+      background: #e9e4da; color: var(--ink); vertical-align: text-bottom;
+    }
+    .grade-info { margin-top: .7rem; border: 1px solid var(--line);
+                  border-radius: 10px; padding: .6rem .8rem; }
+    .grade-info summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+    .grade-row { display: flex; gap: .8rem; align-items: center;
+                 margin-top: .7rem; font-size: .92rem; }
+    .grade-row svg { width: 64px; height: 64px; flex: none; }
+    .grade-row svg rect { fill: #fff; stroke: var(--ink); stroke-width: 2; }
+    .grade-row svg .art { fill: none; stroke: var(--line); stroke-width: 2; }
+    .grade-row svg .ring { fill: none; stroke: var(--muted); stroke-width: 1.5;
+                           stroke-dasharray: 3 3; opacity: .7; }
+    .grade-row svg .wear { fill: var(--line); stroke: var(--muted); stroke-width: 1; }
+    .grade-row svg .scuff { stroke: var(--line); stroke-width: 1.5; }
+    .grade-row svg .pen { fill: none; stroke: #33507a; stroke-width: 2;
+                          stroke-linecap: round; }
+    .grade-row svg .split { fill: none; stroke: var(--bad); stroke-width: 2; }
+    .grade-row svg .tape { fill: #d9c68f; opacity: .85; stroke: var(--muted);
+                           stroke-width: 1; stroke-dasharray: 2 2; }
   </style>
+  <script>
+  // Condition slider: 1..5 maps onto the grade scale; the hidden field is the
+  // submitted truth so an ungraded set stays NULL until the slider is touched.
+  const GRADES = [
+    ["mint", "perfect — looks unplayed"],
+    ["excellent", "very light wear"],
+    ["good", "regular wear for its age"],
+    ["fair", "writing/drawing, seam split, noticeable damage"],
+    ["poor", "barely holding together, or repaired with tape"],
+  ];
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".grade-picker").forEach(picker => {
+      const slider = picker.querySelector("[data-role=grade-slider]");
+      const hidden = picker.querySelector("input[name=condition_grade]");
+      const nameEl = picker.querySelector("[data-role=grade-name]");
+      const descEl = picker.querySelector("[data-role=grade-desc]");
+      const show = idx => {
+        const [name, desc] = GRADES[idx - 1];
+        slider.value = idx; hidden.value = name;
+        nameEl.textContent = name; descEl.textContent = desc;
+        picker.classList.remove("ungraded");
+      };
+      const current = GRADES.findIndex(([n]) => n === picker.dataset.grade);
+      if (current >= 0) show(current + 1);
+      else picker.classList.add("ungraded");
+      slider.addEventListener("input", () => show(Number(slider.value)));
+    });
+  });
+  </script>
 </head>
 <body>
 <header>

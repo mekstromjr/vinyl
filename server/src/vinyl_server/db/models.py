@@ -53,6 +53,7 @@ from vinyl_shared.states import (
     AccessionStatus,
     AssetKind,
     CaptureStatus,
+    ConditionGrade,
     QCVerdict,
     SideStatus,
     Speed,
@@ -174,6 +175,11 @@ class Accession(Base):
     disc_count: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     has_jacket: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     has_inner_sleeve: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    #: Both NULLABLE: sets inventoried before grading existed stay ungraded
+    #: until someone happens to open them; notes are overflow for the weird.
+    condition_grade: Mapped[ConditionGrade | None] = mapped_column(
+        StrEnumType(ConditionGrade, length=12), nullable=True
+    )
     condition_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     #: NULLABLE on purpose: inventory produces discs that cannot be matched.

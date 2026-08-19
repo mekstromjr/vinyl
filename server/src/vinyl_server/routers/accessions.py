@@ -34,6 +34,7 @@ def create_accession(body: AccessionCreate, session: Session = Depends(get_sessi
         speed_rpm=body.speed_rpm,
         has_jacket=body.has_jacket,
         has_inner_sleeve=body.has_inner_sleeve,
+        condition_grade=body.condition_grade,
         condition_notes=body.condition_notes,
     )
 
@@ -70,7 +71,7 @@ def patch_accession(
 
     if body.disc_count is not None and body.disc_count != acc.disc_count:
         _resize_sides(session, acc, body.disc_count)
-    for field in ("has_jacket", "has_inner_sleeve", "condition_notes"):
+    for field in ("has_jacket", "has_inner_sleeve", "condition_grade", "condition_notes"):
         value = getattr(body, field)
         if value is not None:
             setattr(acc, field, value)
