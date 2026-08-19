@@ -33,6 +33,14 @@ def _post(settings: Settings, path: str, payload: dict) -> None:
     threading.Thread(target=_call, daemon=True).start()
 
 
+def plug_on(settings: Settings) -> None:
+    """Called on barcode scan so the turntable is powered before the record is
+    on the platter. HA's turn_on is idempotent — no state query needed."""
+    if not (settings.ha_url and settings.ha_token and settings.ha_entity):
+        return
+    _post(settings, "/api/services/switch/turn_on", {"entity_id": settings.ha_entity})
+
+
 def plug_off(settings: Settings) -> None:
     if not (settings.ha_url and settings.ha_token and settings.ha_entity):
         return

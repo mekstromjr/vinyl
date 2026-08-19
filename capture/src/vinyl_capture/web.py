@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from vinyl_capture import ha
 from vinyl_capture.apiclient import ApiError, VinylApi
 from vinyl_capture.config import settings
 from vinyl_capture.station import Station
@@ -55,6 +56,9 @@ def create_app(station: Station | None = None, api: VinylApi | None = None) -> F
             sides = api.sides(code)
         except ApiError as exc:
             raise HTTPException(404, str(exc)) from exc
+        # A good scan means a record is about to go on the platter: power the
+        # turntable now instead of making Michael toggle the plug by hand.
+        ha.plug_on(station.settings)
         release = acc.get("release") or {}
         pending = [x for x in sides if x["state"] == "pending" and x["speed_rpm"] != 78]
         return {
