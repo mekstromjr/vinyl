@@ -67,12 +67,22 @@ def test_retry_demotes_previous_current(api):
     assert api.get(f"/api/captures/{first['id']}").json()["is_current"] is False
 
 
-def test_cannot_start_while_recording(api):
+def test_stale_recording_auto_failed_by_new_start(api):
+    """Power loss leaves a capture stuck in 'recording'. One station means a
+    new start for the side is proof that attempt died — the server fails it
+    instead of 409ing the operator into manual database surgery."""
     side_id, _ = _side(api)
-    _start(api, side_id)
-    resp = api.post("/api/captures", json={"side_id": side_id})
-    assert resp.status_code == 409
-    assert "already recording" in resp.text
+    stale = _start(api, side_id)
+
+    second = _start(api, side_id)
+    assert second["is_current"] is True
+    assert second["supersedes"] == stale["id"]
+    assert second["status"] == "recording"
+
+    failed = api.get(f"/api/captures/{stale['id']}").json()
+    assert failed["status"] == "failed"
+    assert failed["is_current"] is False
+    assert "died without reporting" in failed["failure_reason"]
 
 
 def test_78_and_skipped_sides_refused(api):

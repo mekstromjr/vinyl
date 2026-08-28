@@ -51,7 +51,14 @@ def start_capture(body: CaptureCreate, session: Session = Depends(get_session)):
     ).first()
     if previous is not None:
         if previous.status == CaptureStatus.RECORDING:
-            raise HTTPException(409, f"a capture of {side.side_id} is already recording")
+            # One station, one recording at a time: a new start for this side
+            # is proof the previous attempt died without reporting (power
+            # loss, crash). Auto-fail it rather than 409ing the operator into
+            # manual database surgery.
+            previous.status = CaptureStatus.FAILED
+            previous.failure_reason = (
+                "superseded by a new recording — previous attempt died without reporting"
+            )
         previous.is_current = False
         session.flush()  # release the partial unique index before the new insert
 
