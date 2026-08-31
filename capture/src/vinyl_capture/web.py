@@ -8,6 +8,8 @@ REVIEW (verdict: flip it, next record, or try again).
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -27,6 +29,10 @@ class ScanBody(BaseModel):
 
 class ArmBody(BaseModel):
     side_id: str
+
+
+class PlugBody(BaseModel):
+    state: Literal["on", "off"]
 
 
 def create_app(station: Station | None = None, api: VinylApi | None = None) -> FastAPI:
@@ -85,6 +91,14 @@ def create_app(station: Station | None = None, api: VinylApi | None = None) -> F
         except (RuntimeError, ApiError) as exc:
             raise HTTPException(409, str(exc)) from exc
         return station.status()
+
+    @app.post("/plug")
+    def plug(body: PlugBody):
+        """Manual turntable power for setup and testing between captures."""
+        if body.state == "off" and station.phase == "recording":
+            raise HTTPException(409, "recording in progress — power stays on")
+        (ha.plug_on if body.state == "on" else ha.plug_off)(station.settings)
+        return {"ok": True}
 
     @app.post("/stop")
     def stop():
@@ -165,6 +179,11 @@ _PAGE = """<!doctype html>
   <h1>Scan the card (or type the accession number)</h1>
   <input id="code" autofocus autocomplete="off" placeholder="GM-0142">
   <div id="scanerr" class="err"></div>
+  <div style="margin-top:2.5rem;color:#8a8378">
+    Turntable power:
+    <button class="ghost" id="plug-on" style="margin-left:.6rem">On</button>
+    <button class="ghost" id="plug-off" style="margin-left:.4rem">Off</button>
+  </div>
 </div>
 
 <div id="grid" class="screen">
@@ -217,6 +236,9 @@ async function post(path, body){ const r = await fetch(path,{method:'POST',
     throw new Error(d.detail || 'error'); }
   return r.json(); }
 
+$('plug-on').addEventListener('click', () => post('/plug', {state:'on'}));
+$('plug-off').addEventListener('click', () =>
+  post('/plug', {state:'off'}).catch(err => { $('scanerr').textContent = err.message; }));
 $('code').addEventListener('keydown', async e => {
   if(e.key !== 'Enter') return;
   const code = $('code').value.trim();
