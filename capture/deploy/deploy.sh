@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# Deploy the capture station from this repo checkout to the ripper laptop.
+# Deploy the capture station from this repo checkout to a station.
 # Run on the Mac. Mirrors ripper's deploy-brick.sh: rsync + remote setup.
 #
-#   capture/deploy/deploy.sh              # full deploy
+#   capture/deploy/deploy.sh              # full deploy to the default station
 #   WRITE_ENV=0 capture/deploy/deploy.sh  # skip secret provisioning
+#
+# VINYL_BRICK selects the station. setup.sh probes the host, so the same deploy
+# works against either base:
+#   VINYL_BRICK=mekadmin@<tailnet-ip>  capture/deploy/deploy.sh  # laptop (Mint)
+#   VINYL_BRICK=root@<station-host>       capture/deploy/deploy.sh  # <pve-host> (Debian/PVE)
 #
 # Secrets: pulled from the CLUSTER (k8s secret vinyl-secrets, same values the
 # server uses) and written to /etc/vinyl-capture/env on the laptop. The laptop
@@ -31,7 +36,10 @@ if [ "$PHASE" != "idle" ] && [ "$PHASE" != "unreachable" ]; then
 fi
 
 say "rsync repo -> $BRICK:/opt/vinyl-capture"
-$SSH "$BRICK" 'sudo install -d -o mekadmin /opt/vinyl-capture'
+# Owner = whoever we connect as, so rsync (which writes as that user) and
+# setup.sh's `sudo -u "$OWNER" uv sync` agree. Hardcoding a user breaks the
+# moment a station is reached as root rather than mekadmin.
+$SSH "$BRICK" 'sudo install -d -o "$(id -un)" /opt/vinyl-capture'
 rsync -a --delete \
   --exclude '.git' --exclude '.venv' --exclude '__pycache__' \
   --exclude '.pytest_cache' --exclude '.ruff_cache' \
