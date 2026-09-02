@@ -71,7 +71,14 @@ VINYL_HA_NOTIFY_SERVICE=mobile_app_<phone>
 EOF
 fi
 
-say "running setup.sh on the laptop"
+# Stamp the deployed version. The station holds a plain rsync with no .git, so
+# without this there is no way to ask a running station which code it has — and
+# a deploy does not necessarily match any tag.
+STAMP=$(git -C "$REPO_ROOT" describe --tags --always --dirty 2>/dev/null || echo unknown)
+say "stamping deployed version: $STAMP"
+$SSH "$BRICK" "printf '%s' '$STAMP' | sudo tee /opt/vinyl-capture/.deployed-version >/dev/null"
+
+say "running setup.sh on the station"
 $SSH "$BRICK" 'sudo bash /opt/vinyl-capture/capture/deploy/setup.sh'
 
 say "status:"

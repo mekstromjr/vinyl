@@ -433,3 +433,73 @@ class Asset(Base):
             "kind <> 'runout' OR side_id IS NOT NULL", name="runout_names_a_side"
         ),
     )
+
+
+class Station(Base):
+    """A capture station: one machine with capture hardware attached.
+
+    Stations are *self-registering*. The agent announces itself on start and
+    heartbeats while it runs; nothing here is provisioned by hand. That keeps
+    "which machines can capture, and what is plugged into them" a live fact
+    rather than a wiki page that rots — which matters now that there is more
+    than one station (meklab/home#175, meklab/home#176).
+
+    This table is presence and capability only. It deliberately holds **no
+    command queue**: the cluster can see stations, not yet drive them. How
+    remote control works is meklab/home#178, and modelling it here would
+    pre-empt that decision.
+
+    Rows are never deleted by the agent. A station that stops heartbeating goes
+    stale, and staleness is derived from ``last_seen_at`` at read time rather
+    than written as a status — otherwise an agent that dies without a clean
+    shutdown would leave a permanent lie in the table.
+    """
+
+    __tablename__ = "station"
+
+    #: Operator-facing and stable across restarts and re-deploys, so history
+    #: survives a rebuild. Defaults to the hostname; see the agent's identity
+    #: module for why that beats a generated UUID here.
+    station_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    hostname: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    #: What is physically attached, as probed by the agent at registration:
+    #: the ALSA capture device, whether an optical drive is present, ffmpeg
+    #: version. Free-form because station hardware is not a closed set — <pve-host>
+    #: has an optical drive the laptop lacks, and a future station may have
+    #: neither audio nor optical.
+    capabilities: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    agent_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    #: Last phase the agent reported: idle | recording | review.
+    #:
+    #: Intentionally NOT constrained to that set. The agent and the server
+    #: deploy independently — the agent by deploy.sh, the server by Flux — so
+    #: version skew is normal, and a CHECK constraint would turn "new agent
+    #: reports a phase this server has not heard of" into a failing heartbeat.
+    #: Losing station visibility is a worse outcome than storing a string the
+    #: UI does not recognise.
+    phase: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    #: Denormalised from the agent's in-flight session so the station list can
+    #: show what is recording without a join. Not authoritative — capture rows
+    #: are.
+    current_side_id: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    #: Sides captured but not yet drained to Garage. Surfaced because a station
+    #: holding masters is a station you should not wipe (see meklab/vinyl#11's
+    #: upload-before-delete requirement).
+    pending_uploads: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    registered_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+
+    __table_args__ = (
+        CheckConstraint("station_id ~ '^[a-zA-Z0-9._-]{1,64}$'", name="station_id_format"),
+        CheckConstraint(
+            "pending_uploads IS NULL OR pending_uploads >= 0", name="pending_uploads_non_negative"
+        ),
+    )

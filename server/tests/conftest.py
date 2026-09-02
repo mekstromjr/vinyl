@@ -115,7 +115,8 @@ def session_factory(engine):
 
     with engine.begin() as conn:
         conn.execute(text(
-            "TRUNCATE asset, capture, disc_side, accession, release RESTART IDENTITY CASCADE"
+            "TRUNCATE station, asset, capture, disc_side, accession, release "
+            "RESTART IDENTITY CASCADE"
         ))
         conn.execute(text("UPDATE collection SET next_number = 1"))
     return sessionmaker(bind=engine, expire_on_commit=False)
