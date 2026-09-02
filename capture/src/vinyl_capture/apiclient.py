@@ -60,3 +60,12 @@ class VinylApi:
 
     def capture(self, capture_id: str) -> dict:
         return self._req("GET", f"/api/captures/{capture_id}")
+
+    # ------------------------------------------------------------- stations --
+    def register_station(self, station_id: str, **fields) -> dict:
+        """PUT, not POST: the agent calls this on every start with the same id,
+        so a restart must update the row rather than conflict."""
+        return self._req("PUT", f"/api/stations/{station_id}", json=fields)
+
+    def station_heartbeat(self, station_id: str, **fields) -> dict:
+        return self._req("POST", f"/api/stations/{station_id}/heartbeat", json=fields)

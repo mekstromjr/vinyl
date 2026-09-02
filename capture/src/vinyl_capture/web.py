@@ -1,9 +1,19 @@
-"""Kiosk web app: localhost-only, grandpa-grade.
+"""The agent: a JSON control surface, plus an optional kiosk page over it.
 
-Four screens, one page, 500 ms polling: SCAN (barcode field autofocused — the
-HID scanner types into it), GRID (side status, next pending preselected),
-RECORDING (meter with peak-hold + target band, countdown, STOP/CANCEL), and
-REVIEW (verdict: flip it, next record, or try again).
+Two things live here, and the split matters. The endpoints (/status, /scan,
+/arm, /plug, /stop, /cancel, /ack) are the station's actual interface and are
+always served. The kiosk HTML is one constant rendered at "/", and it is only a
+client of those endpoints — it can be switched off (VINYL_SERVE_KIOSK=0)
+without touching what the station can do.
+
+It stays ON by default: every station today has an operator standing at it, and
+the local page is the deliberate offline fallback for when the cluster is
+unreachable (meklab/vinyl#11).
+
+The kiosk: four screens, one page, 500 ms polling — SCAN (barcode field
+autofocused, the HID scanner types into it), GRID (side status, next pending
+preselected), RECORDING (meter with peak-hold + target band, countdown,
+STOP/CANCEL), and REVIEW (verdict: flip it, next record, or try again).
 """
 
 from __future__ import annotations
@@ -17,6 +27,7 @@ from pydantic import BaseModel
 from vinyl_capture import ha
 from vinyl_capture.apiclient import ApiError, VinylApi
 from vinyl_capture.config import settings
+from vinyl_capture.heartbeat import Heartbeat
 from vinyl_capture.station import Station
 from vinyl_capture.uploader import Uploader
 
@@ -46,9 +57,16 @@ def create_app(station: Station | None = None, api: VinylApi | None = None) -> F
     app.state.station = station
     app.state.api = api
 
-    @app.get("/", response_class=HTMLResponse)
-    def index():
-        return _PAGE
+    # Presence is optional to capturing, so a station that cannot reach the
+    # cluster still records — the thread just retries in the background.
+    heartbeat = Heartbeat(s, api, station, uploader=uploader)
+    app.state.heartbeat = heartbeat
+    heartbeat.start()
+
+    if s.serve_kiosk:
+        @app.get("/", response_class=HTMLResponse)
+        def index():
+            return _PAGE
 
     @app.get("/status")
     def status():

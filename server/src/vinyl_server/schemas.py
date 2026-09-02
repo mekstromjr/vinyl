@@ -152,3 +152,49 @@ class AssetOut(BaseModel):
     content_type: str | None
     bytes: int | None
     created_at: datetime
+
+
+class StationRegister(BaseModel):
+    """Sent once when an agent starts. Idempotent: re-registering an existing
+    station_id updates it rather than conflicting, so a restart or a redeploy is
+    not an error."""
+
+    display_name: str = Field(max_length=200)
+    hostname: str | None = Field(default=None, max_length=200)
+    #: Probed hardware — ALSA device, optical drive, ffmpeg version. Free-form
+    #: because station hardware is not a closed set.
+    capabilities: dict | None = None
+    agent_version: str | None = Field(default=None, max_length=32)
+
+
+class StationHeartbeat(BaseModel):
+    """Sent periodically while the agent runs.
+
+    Deliberately a small, flat payload rather than the agent's whole
+    ``Station.status()``: that blob carries ``review.summary.envelope_1s``, a
+    per-second amplitude array for the entire side. Posting it every few seconds
+    would ship megabytes of waveform to the server for a status line that only
+    needs a phase and a side id.
+    """
+
+    phase: str | None = Field(default=None, max_length=20)
+    current_side_id: str | None = Field(default=None, max_length=24)
+    pending_uploads: int | None = Field(default=None, ge=0)
+
+
+class StationOut(BaseModel):
+    station_id: str
+    display_name: str
+    hostname: str | None
+    capabilities: dict | None
+    agent_version: str | None
+    phase: str | None
+    current_side_id: str | None
+    pending_uploads: int | None
+    last_seen_at: datetime | None
+    registered_at: datetime
+    #: Derived at read time from ``last_seen_at``, never stored: an agent that
+    #: dies without a clean shutdown cannot leave a stale "online" behind.
+    online: bool
+
+    model_config = {"from_attributes": True}

@@ -41,6 +41,13 @@ class Settings:
     ha_token: str
     ha_entity: str
     ha_notify_service: str
+    #: Station identity reported to the cluster. Empty = derive from hostname.
+    station_id: str
+    station_name: str
+    #: Serve the kiosk HTML at "/". False leaves the JSON control surface intact
+    #: and drops only the page — for a station driven from the cluster UI that
+    #: nobody stands in front of.
+    serve_kiosk: bool
 
 
 @lru_cache(maxsize=1)
@@ -65,4 +72,10 @@ def settings() -> Settings:
         ha_token=_env("VINYL_HA_TOKEN", ""),
         ha_entity=_env("VINYL_HA_ENTITY", ""),
         ha_notify_service=_env("VINYL_HA_NOTIFY_SERVICE", ""),
+        station_id=_env("VINYL_STATION_ID", ""),
+        station_name=_env("VINYL_STATION_NAME", ""),
+        # Defaults ON: every station today has an operator standing at it, and
+        # the local page is the deliberate offline fallback for when the
+        # cluster is unreachable. Turning it off is opt-in.
+        serve_kiosk=_env("VINYL_SERVE_KIOSK", "1") not in ("0", "false", "no"),
     )
