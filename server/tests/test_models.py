@@ -19,6 +19,7 @@ def test_all_tables_present():
         "disc_side",
         "capture",
         "asset",
+        "station",
     }
 
 
