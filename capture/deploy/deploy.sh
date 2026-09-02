@@ -27,7 +27,13 @@ say() { printf '\033[1;35m[deploy]\033[0m %s\n' "$*"; }
 # caller's idle check and the restart were ~90s apart. The check now lives
 # HERE, immediately before anything destructive, and aborts loudly.
 say "idle guard: checking the station"
-PHASE=$($SSH "$BRICK" 'curl -s -m 3 http://127.0.0.1:8081/status 2>/dev/null' | python3 -c "import json,sys
+# `|| true` is load-bearing. curl exits 7 when nothing is listening, and under
+# `set -euo pipefail` that failure propagates out of the command substitution
+# and kills the deploy before the "unreachable" branch below is ever reached --
+# so this guard could never bootstrap a station that was not ALREADY running.
+# It only ever worked because the laptop's service was up. Found bringing up
+# <pve-host> from scratch, which aborted at exit 7 with no message.
+PHASE=$($SSH "$BRICK" 'curl -s -m 3 http://127.0.0.1:8081/status 2>/dev/null || true' | python3 -c "import json,sys
 try: print(json.load(sys.stdin).get(\"phase\",\"unknown\"))
 except Exception: print(\"unreachable\")")
 if [ "$PHASE" != "idle" ] && [ "$PHASE" != "unreachable" ]; then
@@ -40,10 +46,18 @@ say "rsync repo -> $BRICK:/opt/vinyl-capture"
 # setup.sh's `sudo -u "$OWNER" uv sync` agree. Hardcoding a user breaks the
 # moment a station is reached as root rather than mekadmin.
 $SSH "$BRICK" 'sudo install -d -o "$(id -un)" /opt/vinyl-capture'
-rsync -a --delete \
+# --no-owner --no-group: `-a` implies -o/-g, which preserves the MAC's numeric
+# uid/gid (501:50). Connecting as an unprivileged user that chown silently
+# fails, so the laptop never showed this -- but as root rsync applies it, and
+# the checkout lands owned by a uid that does not exist on the station.
+# setup.sh then reads `stat -c %U` as UNKNOWN and `sudo -u UNKNOWN` aborts.
+rsync -a --no-owner --no-group --delete \
   --exclude '.git' --exclude '.venv' --exclude '__pycache__' \
   --exclude '.pytest_cache' --exclude '.ruff_cache' \
   "$REPO_ROOT/" "$BRICK:/opt/vinyl-capture/"
+# Self-heal ownership: --no-owner leaves pre-existing files as they are, so a
+# station synced by an older deploy keeps the foreign uid without this.
+$SSH "$BRICK" 'sudo chown -R "$(id -un)" /opt/vinyl-capture'
 
 if [ "$WRITE_ENV" = "1" ]; then
   say "provisioning /etc/vinyl-capture/env from cluster secrets"
