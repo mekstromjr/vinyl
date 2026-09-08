@@ -1,5 +1,9 @@
 # vinyl
 
+> **Read-only mirror.** This project is developed on a self-hosted GitLab instance and
+> mirrored to GitHub for visibility. Issues and pull requests are not accepted here;
+> the mirror is overwritten on every push. Contact: see the profile of [@mekstromjr](https://github.com/mekstromjr).
+
 Digitization pipeline for the inherited record collection: inventory, capture,
 QC, and Jellyfin import. Tracking: [meklab/vinyl issues](https://gitlab.meklab.net/meklab/vinyl/-/issues),
 milestone *meklab: Vinyl Digitization*.

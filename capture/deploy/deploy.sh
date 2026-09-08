@@ -7,7 +7,7 @@
 #
 # VINYL_BRICK selects the station. setup.sh probes the host, so the same deploy
 # works against either base:
-#   VINYL_BRICK=mekadmin@<tailnet-ip>  capture/deploy/deploy.sh  # laptop (Mint)
+#   VINYL_BRICK=<user>@<laptop-tailnet-name> capture/deploy/deploy.sh  # laptop (Mint)
 #   VINYL_BRICK=root@<station-host>       capture/deploy/deploy.sh  # <pve-host> (Debian/PVE)
 #
 # Secrets: pulled from the CLUSTER (k8s secret vinyl-secrets, same values the
@@ -15,7 +15,7 @@
 # never talks to Vault.
 set -euo pipefail
 
-BRICK="${VINYL_BRICK:-mekadmin@<tailnet-ip>}"
+BRICK="${VINYL_BRICK:-root@<station-host>}"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SSH="ssh -o ConnectTimeout=10"
 WRITE_ENV="${WRITE_ENV:-1}"
