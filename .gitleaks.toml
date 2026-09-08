@@ -1,0 +1,7 @@
+# gitleaks config: allowlist known false positives so `gitleaks git .` runs clean.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "reportlab barcode kwargs (barHeight/barWidth) trip the generic-api-key rule"
+regexes = ['''barHeight=''']
