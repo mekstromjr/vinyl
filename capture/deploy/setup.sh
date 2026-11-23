@@ -5,8 +5,8 @@
 #
 # Runs on two different bases, so everything host-specific is probed, never
 # assumed:
-#   - <station-host>  — Linux Mint 22.3, has PipeWire/WirePlumber + mintupdate
-#   - <station-host>   — Debian/Proxmox VE, lean desktop, NO sound server at all
+#   - a laptop       — Linux Mint 22.3, has PipeWire/WirePlumber + mintupdate
+#   - a PVE host     — Debian/Proxmox VE, lean desktop, NO sound server at all
 # The guards below are what let one script serve both. Do not replace them with
 # unconditional calls: on Debian a missing mintupdate unit silently leaves a
 # drop-in for a unit that will never exist, and an unconditional wireplumber
@@ -78,7 +78,10 @@ done
 # LAN-resident laptop that drags half-gigabyte masters through the tailscale
 # overlay (observed: mid-transfer EOFs when the path degrades to DERP). Pin the
 # hostname to the LAN VIP — same name, same cert, overlay out of the data path.
-grep -q "s3.meklab.net" /etc/hosts ||   echo "<lan-ip> s3.meklab.net  # vinyl-capture: LAN-direct upload path" >> /etc/hosts
+# VINYL_S3_LAN_IP comes from deploy.sh (deploy.local.env); unset skips the pin.
+if [ -n "${VINYL_S3_LAN_IP:-}" ]; then
+  grep -q "s3.meklab.net" /etc/hosts || echo "$VINYL_S3_LAN_IP s3.meklab.net  # vinyl-capture: LAN-direct upload path" >> /etc/hosts
+fi
 
 # --- app venv + service ------------------------------------------------------
 cd /opt/vinyl-capture

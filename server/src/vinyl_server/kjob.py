@@ -37,7 +37,7 @@ def qc_job_manifest(capture_id: uuid.UUID, image: str, namespace: str) -> dict:
          "valueFrom": {"secretKeyRef": {"name": "vinyl-secrets", "key": "ha-token"}}},
         {"name": "VINYL_HA_URL", "value": os.environ.get("VINYL_HA_URL", "https://home.meklab.net")},
         {"name": "VINYL_HA_NOTIFY_SERVICE",
-         "value": os.environ.get("VINYL_HA_NOTIFY_SERVICE", "mobile_app_<phone>")},
+         "value": os.environ.get("VINYL_HA_NOTIFY_SERVICE", "")},
         # settings() requires these even though the QC path never uses them
         {"name": "VINYL_API_KEY", "value": "unused-in-qc-job"},
         {"name": "VINYL_DISCOGS_TOKEN", "value": "unused-in-qc-job"},

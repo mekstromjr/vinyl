@@ -7,12 +7,12 @@ from vinyl_capture import identity
 
 
 def test_station_id_defaults_to_hostname(monkeypatch):
-    monkeypatch.setattr(identity, "hostname", lambda: "<station-host>")
-    assert identity.station_id() == "<station-host>"
+    monkeypatch.setattr(identity, "hostname", lambda: "capture-station-1")
+    assert identity.station_id() == "capture-station-1"
 
 
 def test_configured_id_wins(monkeypatch):
-    monkeypatch.setattr(identity, "hostname", lambda: "<station-host>")
+    monkeypatch.setattr(identity, "hostname", lambda: "capture-station-1")
     assert identity.station_id("rack-station") == "rack-station"
 
 
