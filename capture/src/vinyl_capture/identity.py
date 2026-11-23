@@ -36,7 +36,7 @@ def station_id(configured: str | None = None) -> str:
     """Stable identity for this station.
 
     Defaults to the hostname rather than a generated UUID: the id shows up in
-    the station list and in support conversations, so "<station-host>" beats an
+    the station list and in support conversations, so "capture-station-1" beats an
     opaque identifier. It also survives a reinstall without a state file to
     preserve, which a UUID would not.
     """

@@ -8,15 +8,21 @@
 # VINYL_BRICK selects the station. setup.sh probes the host, so the same deploy
 # works against either base:
 #   VINYL_BRICK=<user>@<laptop-tailnet-name> capture/deploy/deploy.sh  # laptop (Mint)
-#   VINYL_BRICK=root@<station-host>       capture/deploy/deploy.sh  # <pve-host> (Debian/PVE)
+#   VINYL_BRICK=root@<station-host>     capture/deploy/deploy.sh  # Debian/PVE host
+#
+# Site-specific defaults (station, HA entities, LAN S3 address) live in the
+# gitignored capture/deploy/deploy.local.env; see deploy.local.env.example.
 #
 # Secrets: pulled from the CLUSTER (k8s secret vinyl-secrets, same values the
 # server uses) and written to /etc/vinyl-capture/env on the laptop. The laptop
 # never talks to Vault.
 set -euo pipefail
 
-BRICK="${VINYL_BRICK:-root@<station-host>}"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+LOCAL_ENV="$REPO_ROOT/capture/deploy/deploy.local.env"
+# shellcheck source=/dev/null
+[ -f "$LOCAL_ENV" ] && . "$LOCAL_ENV"
+BRICK="${VINYL_BRICK:?set VINYL_BRICK=<user>@<station-host> (or put it in deploy.local.env)}"
 SSH="ssh -o ConnectTimeout=10"
 WRITE_ENV="${WRITE_ENV:-1}"
 
@@ -80,8 +86,8 @@ VINYL_S3_ACCESS_KEY=$S3_ACCESS
 VINYL_S3_SECRET_KEY=$S3_SECRET
 VINYL_HA_URL=https://home.meklab.net
 VINYL_HA_TOKEN=${HA_TOKEN}
-VINYL_HA_ENTITY=switch.<turntable-plug>
-VINYL_HA_NOTIFY_SERVICE=mobile_app_<phone>
+VINYL_HA_ENTITY=${VINYL_HA_ENTITY:-}
+VINYL_HA_NOTIFY_SERVICE=${VINYL_HA_NOTIFY_SERVICE:-}
 EOF
 fi
 
@@ -93,7 +99,7 @@ say "stamping deployed version: $STAMP"
 $SSH "$BRICK" "printf '%s' '$STAMP' | sudo tee /opt/vinyl-capture/.deployed-version >/dev/null"
 
 say "running setup.sh on the station"
-$SSH "$BRICK" 'sudo bash /opt/vinyl-capture/capture/deploy/setup.sh'
+$SSH "$BRICK" "sudo VINYL_S3_LAN_IP='${VINYL_S3_LAN_IP:-}' bash /opt/vinyl-capture/capture/deploy/setup.sh"
 
 say "status:"
 $SSH "$BRICK" 'systemctl is-active vinyl-capture.service; curl -fsS -m 3 http://127.0.0.1:8081/healthz || true'

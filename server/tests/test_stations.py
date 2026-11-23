@@ -20,10 +20,10 @@ CAPS = {
 }
 
 
-def _register(api, station_id="<station-host>", **overrides):
+def _register(api, station_id="capture-station-1", **overrides):
     body = {
         "display_name": "<pve-host> (rack)",
-        "hostname": "<station-host>",
+        "hostname": "capture-station-1",
         "capabilities": CAPS,
         "agent_version": "v0.10.1-4-g1becc03",
     } | overrides
@@ -34,13 +34,13 @@ def _register(api, station_id="<station-host>", **overrides):
 
 def test_register_then_list(api):
     got = _register(api)
-    assert got["station_id"] == "<station-host>"
+    assert got["station_id"] == "capture-station-1"
     assert got["capabilities"]["can_rip_optical"] is True
     # Registration is itself proof of life — no waiting a heartbeat to appear up.
     assert got["online"] is True
 
     listed = api.get("/api/stations").json()
-    assert [s["station_id"] for s in listed] == ["<station-host>"]
+    assert [s["station_id"] for s in listed] == ["capture-station-1"]
 
 
 def test_registration_is_idempotent(api):
@@ -54,7 +54,7 @@ def test_registration_is_idempotent(api):
 def test_heartbeat_updates_state(api):
     _register(api)
     resp = api.post(
-        "/api/stations/<station-host>/heartbeat",
+        "/api/stations/capture-station-1/heartbeat",
         json={"phase": "recording", "current_side_id": "GM-0001-D1-A", "pending_uploads": 2},
     )
     assert resp.status_code == 200, resp.text
@@ -80,11 +80,11 @@ def test_online_is_derived_not_stored(api, session_factory):
     from vinyl_server.db.models import Station
 
     with session_factory() as s:
-        station = s.get(Station, "<station-host>")
+        station = s.get(Station, "capture-station-1")
         station.last_seen_at = datetime.now(UTC) - timedelta(hours=3)
         s.commit()
 
-    assert api.get("/api/stations/<station-host>").json()["online"] is False
+    assert api.get("/api/stations/capture-station-1").json()["online"] is False
 
 
 def test_unknown_phase_is_accepted(api):
@@ -92,7 +92,7 @@ def test_unknown_phase_is_accepted(api):
     fail the heartbeat and drop the station out of view."""
     _register(api)
     resp = api.post(
-        "/api/stations/<station-host>/heartbeat", json={"phase": "some-future-phase"}
+        "/api/stations/capture-station-1/heartbeat", json={"phase": "some-future-phase"}
     )
     assert resp.status_code == 200
     assert resp.json()["phase"] == "some-future-phase"
@@ -100,7 +100,7 @@ def test_unknown_phase_is_accepted(api):
 
 def test_requires_api_key(api):
     resp = api.put(
-        "/api/stations/<station-host>",
+        "/api/stations/capture-station-1",
         json={"display_name": "x"},
         headers={"X-API-Key": "wrong"},
     )
