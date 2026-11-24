@@ -1,6 +1,6 @@
 [Unit]
 Description=Vinyl capture station — kiosk UI + ALSA recorder + Garage uploader
-Documentation=https://gitlab.meklab.net/meklab/vinyl
+Documentation=https://github.com/mekstromjr/vinyl
 After=network-online.target sound.target
 Wants=network-online.target
 
